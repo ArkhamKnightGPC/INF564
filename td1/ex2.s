@@ -4,7 +4,7 @@ main:
     pushq %rbp
     movq  %rsp, %rbp # aligning %rsp and %rbp at beginning of main
     movq  $0, %rbx # we use register %rbx to store n
-    movq  $20, %r12 # we store constant 20 in %rcx
+    movq  $20, %r12 # we store constant 20 in %r12
 main_loop:
     cmpq  %r12, %rbx # compare n(rbx) and 20(r12)
     jnle  end_loop # if n>20 => break loop!
