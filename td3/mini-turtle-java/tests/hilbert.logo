@@ -1,8 +1,4 @@
 
-(* La courbe de Hilbert
-     cf http://fr.wikipedia.org/wiki/Courbe_de_Hilbert
-*)
-
 def l(n) {
   if n {
     turnright 90

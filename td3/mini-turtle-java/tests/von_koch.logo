@@ -1,6 +1,4 @@
 
-(* Le flocon de Von Koch *)
-
 def von_koch(n, d) {
   if n {
     von_koch (n-1, d/3)
