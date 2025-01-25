@@ -149,7 +149,7 @@ Integer = [:digit:]+
 
     {WhiteSpace}
     {
-        
+
     }
 
     .
@@ -158,4 +158,12 @@ Integer = [:digit:]+
       ));
     }
 
+}
+
+<COMMENT> {
+      "*)"         { yybegin(YYINITIAL); }
+      {WhiteSpace} { /* ignore */ }
+      .            { /* ignore */ }
+      <<EOF>>    { throw new Exception(String.format(
+        "Line %d, column %d: unclosed comment\n", yyline, yycolumn)); }
 }
