@@ -11,4 +11,5 @@ The goal of this assignment is to introduce the x86 assembly language (the targe
 The goal of this lab is to build an interpreter for a simple fragment of Python, called [mini-Python](https://www.enseignement.polytechnique.fr/informatique/INF564/projet/mini-python-v1.pdf). The exercise includes different types of statements (assignment, conditional, loop (for), output with print, returning a value with return, evaluation an expression) and expressions (processing constants, access to a variable, building a list, access to a list element, function call, binary operators).
 
 - **TD3**: Lexical and Syntaxical Analysis (Mini-Turtle parser in Java)
+
 The goal of this lab is to implement the parsing of a small Logo language (graphical turtle) whose interpreter is provided. Parsing is implemented using the tools JFlex and CUP.
