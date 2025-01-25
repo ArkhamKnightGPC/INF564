@@ -1,0 +1,156 @@
+import java_cup.runtime.*;
+import java.util.*;
+
+/*
+Here we declare "terminal symbols"(tokens) that will
+be reused in Lexer.flex
+*/
+terminal String IDENT;
+terminal Integer CST;
+terminal IF, ELSE, DEF, REPEAT, PENUP, PENDOWN, FORWARD, TURNLEFT,
+         TURNRIGHT, COLOR, BLACK, WHITE, RED, GREEN, BLUE;
+terminal PLUS, MINUS, TIMES, DIV, LPAREN, RPAREN, BEGIN, END, COMMA;
+terminal UMINUS;
+
+/*
+Here we declare "non-terminal symbols"
+*/
+non terminal File file;
+non terminal Def def;
+non terminal LinkedList<Def> list_def;
+non terminal LinkedList<Stmt> list_stmt;
+non terminal LinkedList<String> list_comma_ident, nonempty_list_comma_ident;
+non terminal Stmt stmt;
+non terminal Expr expr;
+non terminal LinkedList<Expr> nonempty_list_comma_expr, list_comma_expr;
+non terminal Color color;
+
+/*
+Here we declare priorities (in ascending order)
+and operator associativities
+*/
+precedence left PLUS, MINUS;
+precedence left TIMES, DIV;
+precedence nonassoc UMINUS;
+precedence nonassoc IF;
+precedence nonassoc ELSE;
+
+/* 
+ENTRYPOINT FOR GRAMMAR
+*/
+start with file;
+
+/*
+Here we write the different rules in our grammar
+*/
+file ::=
+  list_def:l list_stmt:b
+    {: RESULT = new File(l, new Sblock(b)); :}
+;
+
+def ::=
+  DEF IDENT:f LPAREN list_comma_ident:x RPAREN stmt:s
+    {: RESULT = new Def(f, x, s); :}
+;
+
+stmt ::=
+  PENUP
+    {: RESULT = new Spenup(); :}
+| PENDOWN
+    {: RESULT = new Spendown(); :}
+| FORWARD expr:e
+    {: RESULT = new Sforward(e); :}
+| TURNLEFT expr:e
+    {: RESULT = new Sturnleft(e); :}
+| TURNRIGHT expr:e
+    {: RESULT = new Sturnright(e); :}
+| COLOR color:c
+    {: RESULT = new Scolor(c); :}
+| IDENT:f LPAREN list_comma_expr:l RPAREN
+    {: RESULT = new Scall(f, l); :}
+| IF expr:c stmt:s
+    {: RESULT = new Sif(c, s, new Sblock()); :}
+| IF expr:c stmt:s1 ELSE stmt:s2
+    {: RESULT = new Sif(c, s1, s2); :}
+| REPEAT expr:e stmt:b
+    {: RESULT = new Srepeat(e, b); :}
+| BEGIN list_stmt:l END
+    {: RESULT = new Sblock(l); :}
+;
+
+expr ::=
+  CST:c
+    {: RESULT = new Ecst(c); :}
+| IDENT:x
+    {: RESULT = new Evar(x); :}
+| MINUS expr:e1
+    {: RESULT = new Eneg(e1); :}
+  %prec UMINUS
+| expr:e1 PLUS expr:e2
+    {: RESULT = new Ebinop(Binop.Badd, e1, e2); :}
+| expr:e1 MINUS expr:e2
+    {: RESULT = new Ebinop(Binop.Bsub, e1, e2); :}
+| expr:e1 TIMES expr:e2
+    {: RESULT = new Ebinop(Binop.Bmul, e1, e2); :}
+| expr:e1 DIV expr:e2
+    {: RESULT = new Ebinop(Binop.Bdiv, e1, e2); :}
+| LPAREN expr:e RPAREN
+    {: RESULT = e; :}
+;
+
+list_comma_expr ::=
+  nonempty_list_comma_expr:l
+   {: RESULT = l; :}
+|
+   {: RESULT = new LinkedList<Expr>(); :}
+;
+
+nonempty_list_comma_expr ::=
+  expr:x COMMA nonempty_list_comma_expr:l
+   {: l.addFirst(x); RESULT = l; :}
+| expr:x
+   {: LinkedList<Expr> l = new LinkedList<Expr>();
+      l.add(x); RESULT = l; :}
+;
+
+list_comma_ident ::=
+  nonempty_list_comma_ident:l
+   {: RESULT = l; :}
+|
+   {: RESULT = new LinkedList<String>(); :}
+;
+
+nonempty_list_comma_ident ::=
+  IDENT:x COMMA nonempty_list_comma_ident:l
+   {: l.addFirst(x); RESULT = l; :}
+| IDENT:x
+   {: LinkedList<String> l = new LinkedList<String>();
+      l.add(x); RESULT = l; :}
+;
+
+list_def ::=
+  def:d list_def:l
+   {: l.addFirst(d); RESULT = l; :}
+|
+   {: RESULT = new LinkedList<Def>(); :}
+;
+
+list_stmt ::=
+  stmt:s list_stmt:l
+   {: l.addFirst(s); RESULT = l; :}
+|
+   {: RESULT = new LinkedList<Stmt>(); :}
+;
+
+color ::=
+  BLACK
+   {: RESULT = Color.Black; :}
+| WHITE
+   {: RESULT = Color.White; :}
+| RED
+   {: RESULT = Color.Red;   :}
+| GREEN
+   {: RESULT = Color.Green; :}
+| BLUE
+   {: RESULT = Color.Blue;  :}
+;
