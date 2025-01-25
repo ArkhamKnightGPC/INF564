@@ -1,0 +1,43 @@
+
+(* La courbe de Hilbert
+     cf http://fr.wikipedia.org/wiki/Courbe_de_Hilbert
+*)
+
+def l(n) {
+  if n {
+    turnright 90
+    r(n-1)
+    forward 8
+    turnleft 90
+    l(n-1)
+    forward 8
+    l(n-1)
+    turnleft 90
+    forward 8
+    r(n-1)
+    turnright 90
+  }
+}
+
+def r(n) {
+  if n {
+    turnleft 90
+    l(n-1)
+    forward 8
+    turnright 90
+    r(n-1)
+    forward 8
+    r(n-1)
+    turnright 90
+    forward 8
+    l(n-1)
+    turnleft 90
+  }
+}
+
+penup
+forward -250
+turnleft 90
+forward -250
+pendown
+l(6)
