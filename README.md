@@ -13,3 +13,7 @@ The goal of this lab is to build an interpreter for a simple fragment of Python,
 - **TD3**: Lexical and Syntaxical Analysis (Mini-Turtle parser in Java)
 
 The goal of this lab is to implement the parsing of a small Logo language (graphical turtle) whose interpreter is provided. Parsing is implemented using the tools JFlex and CUP.
+
+- **Project**: Mini-Java compiler
+
+The goal is to build a compiler for a tiny fragment of the Java language, called Mini Java, to x86-64 assembly. The parser and the abstract syntax are provided. Static typing and code generation must be implemented.
