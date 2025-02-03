@@ -8,27 +8,17 @@ class Typing {
 
   static boolean debug = false;
 
+  static LinkedList<TDClass> typedClasses;
+
   // use this method to signal typing errors
   static void error(Location loc, String msg) {
     String l = loc == null ? " <no location>" : " " + loc;
     throw new Error(l + "\nerror: " + msg);
   }
 
-  static Ident getPDeclName(PDecl pdecl){
-    if(pdecl instanceof PDattribute){
-      return ((PDattribute)pdecl).x;
-    }else if(pdecl instanceof PDconstructor){
-      return ((PDconstructor)pdecl).x;
-    }else if(pdecl instanceof PDmethod){
-      return ((PDmethod)pdecl).x;
-    }
-    return null;
-  }
-  
-
   static TFile file(PFile f) {
 
-    LinkedList<TDClass> typed_classes = new LinkedList<TDClass>();
+    typedClasses = new LinkedList<TDClass>();
     SymbolTable symbolTable = new SymbolTable();
     SymbolTableVisitor myVisitor = new SymbolTableVisitor();
     
@@ -50,16 +40,20 @@ class Typing {
       symbolTable.scope_bind(className, symbol);
     }
 
-    // 2. declare inheritance relations (extends) attributes, constructors, and methods
+    // 2. declare inheritance relations (extends_) attributes, constructors, and methods
     it = f.l.listIterator();
     while(it.hasNext()){
       PClass pclass = it.next();
+
       Ident className = pclass.name;
       Ident fatherName = pclass.ext;
       Symbol fatherSymbol = null;
       LinkedList<PDecl> classDecl = pclass.l;
 
-      Symbol pclass_symbol = symbolTable.scope_look_current(className); //after first step, we know we have something here!
+      Symbol pclassSymbol = symbolTable.scope_look_current(className); //after first step, we know we have something here!
+      TTclass tclass = (TTclass)pclassSymbol.type;
+      typedClasses.add(new TDClass(tclass.c, new LinkedList<TDecl>()));//we declare this class, uniqueness was checked :)
+
       if(fatherName != null){//this class inherits from someone!
         fatherSymbol = symbolTable.scope_look_current(fatherName);
         if(fatherSymbol == null){
@@ -67,6 +61,9 @@ class Typing {
           error(className.loc, "Class " + className.id + " inherits from non-existing class");
           return null;
         }
+
+        TDClass tdclass = typedClasses.getLast();
+        tdclass.c.extends_ = ((TTclass)fatherSymbol.type).c; //declare inheritance relation!
       }
 
       //let's add attributes, constructor and methods to hash table
@@ -75,9 +72,11 @@ class Typing {
       ListIterator<PDecl> it2 = classDecl.listIterator();
       while(it2.hasNext()){
         PDecl pdecl = it2.next();
-        pdecl.accept(myVisitor);
-        Symbol symbol = myVisitor.get_result();
-        symbolTable.scope_bind(getPDeclName(pdecl), symbol);
+        pdecl.accept(myVisitor); //visitor makes necessary updates to symbol table!
+        if(myVisitor.errorFlag){
+          error(className.loc, "Error found in " + className.id + ": " + myVisitor.errorMsg);
+          return null;
+        }
       }
 
       // 3. type check the body of constructors and methods.
@@ -87,12 +86,15 @@ class Typing {
         // we must make this step inside step 2, because when we leave this scope, hash table will be popped!
         PDecl pdecl = it2.next();
         pdecl.accept(myVisitor);
-        // ok... maybe we'll have problems using vistors here :( we will see!
+        if(myVisitor.errorFlag){
+          error(className.loc, "Error found in " + className.id + ": " + myVisitor.errorMsg);
+          return null;
+        }
       }
       symbolTable.scope_exit();
     }
 
-    return new TFile(typed_classes);
+    return new TFile(typedClasses);
   }
 
 }

@@ -6,7 +6,7 @@ import java.util.Stack;
 public class SymbolTable{
   /* we will structure our symbol table as a stack of hash tables
     *        - Inner scope Table (stack top)
-    *        - Function scope Table
+    *        - Class scope Table
     *        - Global scope Table
     * this allows a symbol (like x) to exist in multiple scopes without conflict !!
     * As we proceed through the program,
@@ -14,8 +14,8 @@ public class SymbolTable{
     *         - and pop a table every time a scope is left
   */
 
-  private Stack<HashMap<Ident, Symbol>> scopes = new Stack<>();
-  private int level = 0;
+  private static Stack<HashMap<Ident, Symbol>> scopes = new Stack<>();
+  private static int level = 0;
 
   SymbolTable(){
     //constructor will initialize global scope

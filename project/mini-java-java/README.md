@@ -46,14 +46,15 @@ The statement says
 
 We do this step in the pass of the PFile as step 2 because we reuse the Class scope Hash Map in the Symbol Table which will be popped if we leave this scope to perfom a new pass.
 
+The symbol table attributes are static. We can add/remove variables when analysing the body of constructors and methods inside the visitor!
 
 ## Appendix: The Symbol Table
 
 We will structure our symbol table as a stack of hash tables
 
-- **Inner scope** Table (stack top)
-- **Class scope** Table
-- **Global scope** Table
+- **Inner scope** Table (stack top) contains variables inside a method, function or constructor
+- **Class scope** Table contains methods and constructor inside a class
+- **Global scope** Table contains classes
 
 This allows a symbol (like x) to exist in multiple scopes without conflict !! As we proceed through the program,
 
