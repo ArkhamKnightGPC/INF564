@@ -451,36 +451,6 @@ class TTclass extends TType {
   void accept(TVisitor v) { v.visit(this); }
 }
 
-/** Typed Class
-
- (Called Class_ to avoid the confusion with java.lang.Class.) */
-class Class_ {
-  final String name;
-  Class_ extends_;
-  final HashMap<String, Method> methods;
-  final HashMap<String, Attribute> attributes;
-
-  Class_(String name) {
-    this.name = name;
-    this.extends_ = null;
-    this.methods = new HashMap<>();
-    this.attributes = new HashMap<>();
-  }
-}
-
-/** Method */
-class Method {
-  final String name;
-  final TType type;
-  final LinkedList<Variable> params;
-
-  Method(String name, TType type, LinkedList<Variable> params) {
-    this.name = name;
-    this.type = type;
-    this.params = params;
-  }
-}
-
 /** Variable
 
    In the typed trees, all the occurrences of the same variable

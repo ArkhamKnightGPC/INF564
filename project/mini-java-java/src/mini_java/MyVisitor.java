@@ -2,6 +2,7 @@ package mini_java;
 
 import java.util.LinkedList;
 import java.util.ListIterator;
+import java.util.PropertyPermission;
 
 public class MyVisitor implements Visitor {
     /* We use this visitor to insert symbols into the Symbol Table during the static type check!
@@ -12,6 +13,12 @@ public class MyVisitor implements Visitor {
     protected static boolean go_into_body;
     protected static TType ttype;
     protected static Class_ class_;
+
+    public MyVisitor(){
+        go_into_body = false;
+        ttype = null;
+        class_ = null;
+    }
 
     public void go_into_body_FALSE(){
         go_into_body = false;
@@ -39,7 +46,7 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PTident t) {
-        ttype = null;
+        ttype = new TTvoid(); // TODO: find correct type for this label
     }
 
     @Override
@@ -164,8 +171,12 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PSblock s) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        LinkedList<PStmt> l = s.l;
+        ListIterator<PStmt> it = l.listIterator();
+        while(it.hasNext()){
+            PStmt st = it.next();
+            st.accept(this); //we call visitor on each statement in the block
+        }
     }
 
     @Override
@@ -192,7 +203,12 @@ public class MyVisitor implements Visitor {
     @Override
     public void visit(PDconstructor s) {
         if(go_into_body){//let's analyse parameters and block of statements!!
-            ListIterator<PParam> it = s.l.listIterator();
+
+            LinkedList<PParam> l = s.l;
+            if(l == null){
+                return;
+            }
+            ListIterator<PParam> it = l.listIterator();
 
             Method constructor = class_.methods.get(s.x.id);
 
@@ -229,12 +245,19 @@ public class MyVisitor implements Visitor {
     public void visit(PDmethod s) {
         if(go_into_body){//let's analyse parameters, block of statements
 
-            ListIterator<PParam> it = s.l.listIterator();
+            LinkedList<PParam> l = s.l;
+            if(l == null){
+                return;
+            }
+            ListIterator<PParam> it = l.listIterator();
+
 
             Method method = class_.methods.get(s.x.id);
 
             while(it.hasNext()){
                 PParam pparam = it.next();
+
+                System.out.println(pparam.x.id);
 
                 PType ptype = pparam.ty;
                 ptype.accept(this);
@@ -257,7 +280,11 @@ public class MyVisitor implements Visitor {
                 Typing.error(null, "Class " + class_.name + " has duplicate methods " + s.x.id);
                 return;
             }
-            s.ty.accept(this);
+            if(s.ty != null){
+                s.ty.accept(this);
+            }else{
+                ttype = new TTnull();
+            }
             Method method = new Method(s.x.id, ttype, new LinkedList<Variable>());
             class_.methods.put(s.x.id, method);
         }

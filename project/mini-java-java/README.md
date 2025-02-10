@@ -1,7 +1,5 @@
 # README: Project details
 
-Throughout this project, I used the book *Introduction to Compilers and Language Design* by *Douglas Thain* as a reference (available for free at [compilerbook.org](compilerbook.org)). The comments provided in the code often consists of passages from the book that I found helpful while coding a specific part.
-
 **Table of Contents**
 
 - [Static Type Checking](#static-type-checking)

@@ -1,5 +1,6 @@
 package mini_java;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.ListIterator;
 
@@ -21,6 +22,8 @@ class Typing {
     typedClasses = new LinkedList<TDClass>();
 
     MyVisitor myVisitor = new MyVisitor();
+    InheritanceDAG inheritanceDAG = new InheritanceDAG();
+    ClassesTable.init();
     
     // 1. declare all classes and check for uniqueness of classes
     ListIterator<PClass> it = f.l.listIterator();
@@ -37,11 +40,11 @@ class Typing {
 
       TDClass tdclass = new TDClass(class_, new LinkedList<TDecl>());
       typedClasses.add(tdclass);//we declare this class, uniqueness was checked :)
+      inheritanceDAG.addNode(class_);
     }
 
     // 2. declare inheritance relations (extends_) attributes, constructors, and methods
     it = f.l.listIterator();
-
     while(it.hasNext()){
       PClass pclass = it.next();
 
@@ -52,18 +55,16 @@ class Typing {
 
       Class_ class_ = ClassesTable.lookup(className.id); //after step 1, we know class_ is not null!
 
-      if(fatherClassName != null){//this class inherits from someone!
+      if(fatherClassName != null){//this class inherits from another one!!
         fatherClass_ = ClassesTable.lookup(fatherClassName.id);
         if(fatherClass_ == null){
           //class is inheriting from a non-existing class!
           error(className.loc, "Class " + className.id + " inherits from non-existing class " + fatherClassName.id);
           return null;
         }
-
         class_.extends_ = fatherClass_; //declare inheritance relation (TDclass in linked list should point to this updated object)
+        inheritanceDAG.addEdge(fatherClass_, class_);
       }
-
-      //TODO: Inheritance cycle check!
 
       //let's add attributes, constructor and methods to hash table
       myVisitor.setClass_(class_);
@@ -82,9 +83,18 @@ class Typing {
 
     }
 
+    //we want to process parent classes before classes that inherit them!!
+    // =< we use toposort!
+    ArrayList<Class_> sortedClasses = inheritanceDAG.topoSort();
+
+    if(sortedClasses.size() < typedClasses.size()){
+      //cycle was found during toposort!
+      error(null, "Inheritance relations have a cycle!!");
+      return null;
+    }
+
     // 3. type check the body of constructors and methods
     it = f.l.listIterator();
-
     while(it.hasNext()){
       PClass pclass = it.next();
 

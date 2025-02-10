@@ -6,7 +6,7 @@ public class ClassesTable{
 
   public static HashMap<String, Class_> classesTable;
 
-  ClassesTable(){//initialize HashMap for the desired scope
+  static void init(){//initialize HashMap for the desired scope
     classesTable = new HashMap<String, Class_>();
   }
 
