@@ -1,8 +1,10 @@
 package mini_java;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.ListIterator;
 import java.util.PropertyPermission;
+import java.util.Set;
 
 public class MyVisitor implements Visitor {
     /* We use this visitor to insert symbols into the Symbol Table during the static type check!
@@ -13,11 +15,17 @@ public class MyVisitor implements Visitor {
     protected static boolean go_into_body;
     protected static TType ttype;
     protected static Class_ class_;
+    protected static Set<String> keywords;
+    protected static HashMap<String, TType> variables;
 
     public MyVisitor(){
         go_into_body = false;
         ttype = null;
         class_ = null;
+        keywords = Set.of("boolean", "class", "else", "extends", "false",
+        "for", "if", "instanceof",  "int",  "new", "null", "public", "return", "static",
+        "this", "true", "void");
+        variables = new HashMap<String, TType>();
     }
 
     public void go_into_body_FALSE(){
@@ -46,7 +54,19 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PTident t) {
-        ttype = new TTvoid(); // TODO: find correct type for this label
+        String name = t.x.id;
+
+        if(keywords.contains(name)){// check if name is a keyword
+            Typing.error(null, "Identifier " + name + " is a reserved keyword");
+            return;
+        }
+
+        if(variables.containsKey(name)){
+            ttype = variables.get(name);
+        }else{
+            Typing.error(null, "Identifier " + name + " is not defined");
+            return;
+        }
     }
 
     @Override

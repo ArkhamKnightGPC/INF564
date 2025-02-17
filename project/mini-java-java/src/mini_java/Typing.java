@@ -1,6 +1,7 @@
 package mini_java;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.ListIterator;
 
@@ -44,6 +45,7 @@ class Typing {
     }
 
     // 2. declare inheritance relations (extends_) attributes, constructors, and methods
+    HashMap<Class_, LinkedList<PDecl>> classDecls = new HashMap<Class_, LinkedList<PDecl>>();
     it = f.l.listIterator();
     while(it.hasNext()){
       PClass pclass = it.next();
@@ -54,6 +56,7 @@ class Typing {
       LinkedList<PDecl> classDecl = pclass.l;
 
       Class_ class_ = ClassesTable.lookup(className.id); //after step 1, we know class_ is not null!
+      classDecls.put(class_, classDecl);
 
       if(fatherClassName != null){//this class inherits from another one!!
         fatherClass_ = ClassesTable.lookup(fatherClassName.id);
@@ -65,8 +68,39 @@ class Typing {
         class_.extends_ = fatherClass_; //declare inheritance relation (TDclass in linked list should point to this updated object)
         inheritanceDAG.addEdge(fatherClass_, class_);
       }
+    }
 
-      //let's add attributes, constructor and methods to hash table
+    //we want to process parent classes before classes that inherit them!!
+    // => we use toposort!
+    ArrayList<Class_> sortedClasses = inheritanceDAG.topoSort();
+
+    if(sortedClasses.size() < typedClasses.size()){
+      //cycle was found during toposort!
+      error(null, "Inheritance relations have a cycle!!");
+      return null;
+    }
+
+    for(Class_ class_ : sortedClasses){
+      LinkedList<PDecl> classDecl = classDecls.get(class_);
+
+      LinkedList<Class_> superClasses = new LinkedList<Class_>();
+      Class_ c = class_.extends_;
+      while(c != null){// we will use a stack to consider inherited classes first
+        superClasses.add(c); // because of toposort we know they are already processed!!
+        c = c.extends_;
+      }
+      while(superClasses.isEmpty() == false){
+        c = superClasses.pollLast();
+        for(Attribute attribute : c.attributes.values()){
+          class_.attributes.put(attribute.name, attribute);
+        }
+        for(Method method : c.methods.values()){
+          class_.methods.put(method.name, method);
+        }
+        //Hash maps will handle overwriting naturally for us :)
+      }
+
+      //let's add OUR OWN attributes, constructor and methods to hash table
       myVisitor.setClass_(class_);
       myVisitor.go_into_body_FALSE(); //visitor will NOT enter body of constructors and methos
       ListIterator<PDecl> it2 = classDecl.listIterator();
@@ -80,17 +114,6 @@ class Typing {
         Method constructor = new Method(class_.name, new TTvoid(), new LinkedList<Variable>());
         class_.methods.put(class_.name, constructor);
       }
-
-    }
-
-    //we want to process parent classes before classes that inherit them!!
-    // =< we use toposort!
-    ArrayList<Class_> sortedClasses = inheritanceDAG.topoSort();
-
-    if(sortedClasses.size() < typedClasses.size()){
-      //cycle was found during toposort!
-      error(null, "Inheritance relations have a cycle!!");
-      return null;
     }
 
     // 3. type check the body of constructors and methods

@@ -25,10 +25,10 @@ class Asm extends LabelAsm {
 
 /** x86-64 assembly code */
 public class X86_64 {
-  /** segment de code */
+  /** code section */
   private LinkedList<LabelAsm>	text;
   private StringBuffer          inline;
-  /** segment de données */
+  /** data section */
   private StringBuffer		data;
 
   X86_64() {
@@ -355,6 +355,10 @@ public class X86_64 {
 
   X86_64 quad(long l) {
     return data(".quad " + l);
+  }
+
+  X86_64 quad(String l) {
+    return data(".quad $" + l);
   }
 
   X86_64 globl(String l) {
