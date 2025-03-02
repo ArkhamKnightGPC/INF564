@@ -11,6 +11,8 @@ class Typing {
   static boolean debug = false;
 
   static LinkedList<TDClass> typedClasses;
+  static HashMap<Class_, TDClass> getTDclass = new HashMap<Class_, TDClass>();
+  static HashMap<Method, TDecl> getTDecl = new HashMap<Method, TDecl>();
 
   // use this method to signal typing errors
   static void error(Location loc, String msg) {
@@ -41,6 +43,7 @@ class Typing {
 
       TDClass tdclass = new TDClass(class_, new LinkedList<TDecl>());
       typedClasses.add(tdclass);//we declare this class, uniqueness was checked :)
+      getTDclass.put(class_, tdclass);
       inheritanceDAG.addNode(class_);
     }
 
@@ -81,6 +84,7 @@ class Typing {
     }
 
     for(Class_ class_ : sortedClasses){
+      System.out.println("CLASS " + class_.name);
       LinkedList<PDecl> classDecl = classDecls.get(class_);
 
       LinkedList<Class_> superClasses = new LinkedList<Class_>();
@@ -96,16 +100,27 @@ class Typing {
         }
         for(Method method : c.methods.values()){
           class_.methods.put(method.name, method);
+          TDClass currentTDclass = getTDclass.get(class_);
+          currentTDclass.l.add(getTDecl.get(method)); //add inherited method/constructor to AST
         }
-        //Hash maps will handle overwriting naturally for us :)
+        //how does typed AST respond in case of overriding ??
       }
 
       //let's add OUR OWN attributes, constructor and methods to hash table
-      myVisitor.setClass_(class_);
+      TDClass currenTDclass = getTDclass.get(class_);
+      myVisitor.setClass_(currenTDclass);
+
       myVisitor.go_into_body_FALSE(); //visitor will NOT enter body of constructors and methos
       ListIterator<PDecl> it2 = classDecl.listIterator();
       while(it2.hasNext()){
         PDecl pdecl = it2.next();
+        if(pdecl instanceof PDattribute){
+          System.out.println("FIRST PASS PDattribute " + ((PDattribute)pdecl).x.id);
+        }else if(pdecl instanceof PDconstructor){
+          System.out.println("FIRST PASS PDconstructor " + ((PDconstructor)pdecl).x.id);
+        }else if(pdecl instanceof PDmethod){
+          System.out.println("FIRST PASS PDmethod " + ((PDmethod)pdecl).x.id);
+        }
         pdecl.accept(myVisitor);
       }
 
@@ -117,18 +132,22 @@ class Typing {
     }
 
     // 3. type check the body of constructors and methods
-    it = f.l.listIterator();
-    while(it.hasNext()){
-      PClass pclass = it.next();
-
-      Ident className = pclass.name;
-      LinkedList<PDecl> classDecl = pclass.l;
-      myVisitor.setClass_(ClassesTable.lookup(className.id));
+    for(Class_ class_ : sortedClasses){
+      LinkedList<PDecl> classDecl = classDecls.get(class_);
+      TDClass currenTDclass = getTDclass.get(class_);
+      myVisitor.setClass_(currenTDclass);
 
       ListIterator<PDecl> it2  = classDecl.listIterator();
       myVisitor.go_into_body_TRUE(); //visitor will enter body of constructors and methods
       while(it2.hasNext()){
         PDecl pdecl = it2.next();
+        if(pdecl instanceof PDattribute){
+          System.out.println("SECOND PASS PDattribute " + ((PDattribute)pdecl).x.id);
+        }else if(pdecl instanceof PDconstructor){
+          System.out.println("SECOND PASS PDconstructor " + ((PDconstructor)pdecl).x.id);
+        }else if(pdecl instanceof PDmethod){
+          System.out.println("SECOND PASS PDmethod " + ((PDmethod)pdecl).x.id);
+        }
         pdecl.accept(myVisitor);
       }
     }

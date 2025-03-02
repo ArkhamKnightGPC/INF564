@@ -82,6 +82,7 @@ enum Binop {
   This is shared between parsed and typed trees. */
 abstract class Constant {
   abstract void accept(Visitor v);
+  abstract void accept(TVisitor v);
 }
 
 class Cbool extends Constant {
@@ -91,6 +92,8 @@ class Cbool extends Constant {
   }
   @Override
   void accept(Visitor v) { v.visit(this); }
+  @Override
+  void accept(TVisitor v) { v.visit(this); }
 }
 class Cstring extends Constant {
   final String s;
@@ -99,6 +102,8 @@ class Cstring extends Constant {
   }
   @Override
   void accept(Visitor v) { v.visit(this); }
+  @Override
+  void accept(TVisitor v) { v.visit(this); }
 }
 class Cint extends Constant {
   final long i;
@@ -107,6 +112,8 @@ class Cint extends Constant {
   }
   @Override
   void accept(Visitor v) { v.visit(this); }
+  @Override
+  void accept(TVisitor v) { v.visit(this); }
 }
 
 /** Parsed Expression */
@@ -718,7 +725,7 @@ class TDmethod extends TDecl {
   final Method m;
   final TStmt s;
 
-  TDmethod(Method m, LinkedList<Variable> params, TStmt s) {
+  TDmethod(Method m, TStmt s) {
     super();
     this.m = m;
     this.s = s;

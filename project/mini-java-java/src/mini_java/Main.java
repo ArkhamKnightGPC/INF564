@@ -43,7 +43,7 @@ public class Main {
       if (type_only)
         System.exit(0);
       X86_64 asm = Compile.file(tf);
-      String file_s = file.substring(0, file.length() - 2) + ".s";
+      String file_s = file.substring(0, file.length() - 5) + ".s";
       asm.printToFile(file_s);
     } catch (Exception e) {
       System.out.println(file + ":" + e.getMessage());

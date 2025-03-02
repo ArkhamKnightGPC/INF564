@@ -16,7 +16,6 @@ class Compile {
     myTVisitor = new MyTVisitor();
 
     ret = new X86_64();
-    ret.emit(".text");
     ret.emit(".globl main"); //define entrypoint for the linker!
     LinkedList<TDClass> l = f.l;
 
@@ -25,6 +24,11 @@ class Compile {
     while(it.hasNext()){ // for each class
       TDClass tdClass = it.next();
       Class_ c = tdClass.c;
+
+      if(c.name.equals("Main")){
+        continue;
+      }
+
       ret.dlabel("descriptor_" + c.name); // add a labeled block in the data section
       if(c.extends_ != null){// add ref to super class
         ret.quad("descriptor_" + c.extends_.name);
@@ -58,6 +62,7 @@ class Compile {
             attribute.ofs = offsets.get(attribute.name);
           }else{// we need to set this offset!!
             attribute.ofs = cummulative_offset;
+            offsets.put(attribute.name, attribute.ofs);
             cummulative_offset += 8; // add 1 word to offset
           }
         }
