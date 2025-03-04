@@ -1,10 +1,13 @@
 package mini_java;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.ListIterator;
 import java.util.PropertyPermission;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MyVisitor implements Visitor {
     /* We use this visitor to insert symbols into the Symbol Table during the static type check!
@@ -12,7 +15,7 @@ public class MyVisitor implements Visitor {
      * create the right symbol to insert into the Symbol Table
      */
 
-    protected static boolean go_into_body;
+    protected static boolean goIntoBody, hasConstructor;
     protected static TType ttype;
     protected static TDClass tdclass;
     protected static HashMap<TDecl, TSblock> getTSblock;
@@ -21,31 +24,44 @@ public class MyVisitor implements Visitor {
     protected static TStmt currentStmt;
     protected static TExpr currentExpr;
     protected static String callerName;
+    protected static Boolean needsReturnStatement, hasReturnStatement;
     protected static Set<String> keywords;
-    protected static HashMap<String, TType> variables;
+    protected static HashMap<String, TEvar> variables;
 
     public MyVisitor(){
-        go_into_body = false;
+        goIntoBody = false;
         ttype = null;
         tdclass = null;
         keywords = Set.of("boolean", "class", "else", "extends", "false",
         "for", "if", "instanceof",  "int",  "new", "null", "public", "return", "static",
         "this", "true", "void");
-        variables = new HashMap<String, TType>();
+        variables = new HashMap<String, TEvar>();
         getTSblock = new HashMap<TDecl, TSblock>();
     }
 
-    public void go_into_body_FALSE(){
-        go_into_body = false;
+    static String identifierRegex = "[a-zA-Z_][a-zA-Z_0-9]*";
+    static Pattern identifierPattern = Pattern.compile(identifierRegex);
+    static boolean isIdentifierOk(String id){
+        Matcher mat = identifierPattern.matcher(id);
+        return mat.matches();
+    }
+
+    public static void goIntoBodyFALSE(){
+        goIntoBody = false;
+        hasConstructor = false;
         return;
     }
 
-    public void go_into_body_TRUE(){
-        go_into_body = true;
+    public static void goIntoBodyTRUE(){
+        goIntoBody = true;
         return;
     }
 
-    public void setClass_(TDClass currenTDclass){
+    public static boolean hasConstructor(){
+        return hasConstructor;
+    }
+
+    public static void setClass_(TDClass currenTDclass){
         tdclass = currenTDclass;
     }
 
@@ -63,17 +79,12 @@ public class MyVisitor implements Visitor {
     public void visit(PTident t) {
         String name = t.x.id;
 
-        if(keywords.contains(name)){// check if name is a keyword
-            Typing.error(null, "Identifier " + name + " is a reserved keyword");
+        if(ClassesTable.lookup(name) == null){
+            Typing.error(t.x.loc, "Type identifier " + name + " does not denote a valid type");
             return;
         }
 
-        if(variables.containsKey(name)){
-            ttype = variables.get(name);
-        }else{
-            Typing.error(null, "Identifier " + name + " is not defined");
-            return;
-        }
+        ttype = new TTclass(ClassesTable.lookup(name));
     }
 
     @Override
@@ -128,6 +139,16 @@ public class MyVisitor implements Visitor {
     public void visit(PEident e) {
         Ident id = e.id;
         System.out.println("PEident id = " + id.id);
+
+        if(!isIdentifierOk(id.id)){
+            Typing.error(id.loc, "Identifier " + id.id + " violates identifier syntax");
+            return;
+        }
+
+        if(keywords.contains(id.id)){// check if name is a keyword
+            Typing.error(id.loc, "Identifier " + id.id + " is a reserved keyword");
+            return;
+        }
         callerName = id.id + callerName;
     }
 
@@ -154,8 +175,24 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PEnew e) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit' ENEW");
+        Ident id = e.c;
+        LinkedList<PExpr> pl = e.l;
+
+        if(ClassesTable.lookup(id.id) == null){
+            Typing.error(id.loc, "Class " + id.id + " does not exist!");
+            return;
+        }
+        Class_ class_ = ClassesTable.lookup(id.id);
+        LinkedList<TExpr> tl = new LinkedList<TExpr>();
+
+        ListIterator<PExpr> it = pl.listIterator();
+        while(it.hasNext()){
+            PExpr pe = it.next();
+            pe.accept(this);
+            tl.add(currentExpr);
+        }
+
+        currentExpr = new TEnew(class_, tl);
     }
 
     @Override
@@ -211,8 +248,21 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PSvar s) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit' SVAR");
+        PType ptype = s.ty;
+        Ident id = s.x;
+        PExpr pexpr = s.e;
+
+        if(variables.containsKey(id.id)){
+            Typing.error(id.loc, "Variable " + id.id + " is a duplicate");
+            return;
+        }
+
+        System.out.println("Lets visit variable type");
+        ptype.accept(this);
+        System.out.println("Lets visit variable expression");
+        pexpr.accept(this);
+        Variable var = new Variable(id.id, ttype);
+        currentStmt = new TSvar(var, currentExpr);
     }
 
     @Override
@@ -223,6 +273,7 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PSreturn s) {
+        hasReturnStatement = true;
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'visit' SRET");
     }
@@ -233,6 +284,7 @@ public class MyVisitor implements Visitor {
         LinkedList<PStmt> l = s.l;
         ListIterator<PStmt> it = l.listIterator();
         currentBlock = getTSblock.get(currentTDecl);
+        hasReturnStatement = false;
         while(it.hasNext()){
             PStmt st = it.next();
             if(st instanceof PSexpr){
@@ -251,6 +303,10 @@ public class MyVisitor implements Visitor {
             st.accept(this); //we call visitor on each statement in the block
             currentBlock.l.add(currentStmt);
         }
+        if(needsReturnStatement && !hasReturnStatement){
+            Typing.error(null, "Method is missing a return statement");
+            return;
+        }
     }
 
     @Override
@@ -261,7 +317,7 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PDattribute s) {
-        if(go_into_body){//we're interested in the body of methods and constructors ONLY!
+        if(goIntoBody){//we're interested in the body of methods and constructors ONLY!
             return;
         }else{//let's add this attribute to the symbol table
             if (tdclass.c.attributes.get(s.x.id) != null) {//attributes must be distinct!!
@@ -276,15 +332,16 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PDconstructor s) {
-        if(go_into_body){//let's analyse parameters and block of statements!!
+        hasConstructor = true;
+        if(goIntoBody){//let's analyse parameters and block of statements!!
 
             System.out.println("SECOND PASS IN VISITOR FOR CONSTRUCTOR " + s.x.id);
             LinkedList<PParam> l = s.l;
-            Method constructor = tdclass.c.methods.get(s.x.id);
+            TDconstructor constructor = Typing.getTDconstructor.get(tdclass.c);
 
             if(l != null){
                 ListIterator<PParam> it = l.listIterator();
-
+                Set<String> parameterNames = new HashSet<>();
                 while(it.hasNext()){
                     PParam pparam = it.next();
 
@@ -293,21 +350,30 @@ public class MyVisitor implements Visitor {
 
                     Variable var = new Variable(pparam.x.id, ttype);
 
+                    if(parameterNames.contains(pparam.x.id)){
+                        Typing.error(null, "Parameter " + pparam.x.id + " is a duplicate");
+                        return;
+                    }
                     if(constructor.params.contains(var)){
-                        Typing.error(null, "Class " + tdclass.c.name + " has constructor " + constructor.name + " with duplicate parameter " +  s.x.id);
+                        Typing.error(null, "Class " + tdclass.c.name + " has constructor " + tdclass.c.name + " with duplicate parameter " +  s.x.id);
                         return;
                     }
                     
                     constructor.params.add(var);
+                    parameterNames.add(pparam.x.id);
                 }
             }
 
             //visitor will go into statement block
-            currentTDecl = Typing.getTDecl.get(constructor);
+            currentTDecl = Typing.getTDecl.get((TDecl)constructor);
             s.s.accept(this);
 
         }else{//let's add constructor
             System.out.println("FIRST PASS IN VISITOR FOR CONSTRUCTOR " + s.x.id);
+            if(!tdclass.c.name.equals(s.x.id)){
+                Typing.error(null, "Constructor " + s.x.id + " does not match class name " + tdclass.c.name);
+                return;
+            }
             if(tdclass.c.methods.get(s.x.id) != null){
                 Typing.error(null, "Class " + tdclass.c.name + " has duplicate constructor " + s.x.id);
                 return;
@@ -335,7 +401,7 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PDmethod s) {
-        if(go_into_body){//let's analyse parameters, block of statements
+        if(goIntoBody){//let's analyse parameters, block of statements
 
             System.out.println("SECOND PASS IN VISITOR FOR METHOD " + s.x.id);
             LinkedList<PParam> l = s.l;
@@ -343,7 +409,7 @@ public class MyVisitor implements Visitor {
 
             if(l != null){
                 ListIterator<PParam> it = l.listIterator();
-
+                Set<String> parameterNames = new HashSet<>();
                 while(it.hasNext()){
                     PParam pparam = it.next();
 
@@ -354,12 +420,17 @@ public class MyVisitor implements Visitor {
 
                     Variable var = new Variable(pparam.x.id, ttype);
 
+                    if(parameterNames.contains(pparam.x.id)){
+                        Typing.error(null, "Parameter " + pparam.x.id + " is a duplicate");
+                        return;
+                    }
                     if(method.params.contains(var)){
                         Typing.error(null, "Class " + tdclass.c.name + " has method " + method.name + " with duplicate parameter " +  s.x.id);
                         return;
                     }
                     
                     method.params.add(var);
+                    parameterNames.add(pparam.x.id);
                 }
             }
 
@@ -378,6 +449,13 @@ public class MyVisitor implements Visitor {
                 System.out.println("Lets visit PSfor");
             }
             currentTDecl = Typing.getTDecl.get(method);
+            if(!(method.type instanceof TTvoid)){
+                System.out.println("ok, we will need a return statement " + method.type);
+                needsReturnStatement = true;
+            }else{
+                System.out.println("ok, no return statement :)");
+                needsReturnStatement = false;
+            }
             s.s.accept(this);
 
         }else{//let's add method
@@ -391,7 +469,7 @@ public class MyVisitor implements Visitor {
                 s.ty.accept(this);
             }else{
                 System.out.println("METHOD HAS NO RETURN TYPE => VOID");
-                ttype = new TTnull();
+                ttype = new TTvoid();
             }
             Method method = new Method(s.x.id, ttype, new LinkedList<Variable>());
             tdclass.c.methods.put(s.x.id, method);

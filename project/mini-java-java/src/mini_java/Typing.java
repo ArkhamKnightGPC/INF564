@@ -12,6 +12,7 @@ class Typing {
 
   static LinkedList<TDClass> typedClasses;
   static HashMap<Class_, TDClass> getTDclass = new HashMap<Class_, TDClass>();
+  static HashMap<Class_, TDconstructor> getTDconstructor = new HashMap<Class_, TDconstructor>();
   static HashMap<Method, TDecl> getTDecl = new HashMap<Method, TDecl>();
 
   // use this method to signal typing errors
@@ -27,6 +28,9 @@ class Typing {
     MyVisitor myVisitor = new MyVisitor();
     InheritanceDAG inheritanceDAG = new InheritanceDAG();
     ClassesTable.init();
+    ClassesTable.add("Object", new Class_("Object"));
+    ClassesTable.add("Integer", new Class_("Integer"));
+    ClassesTable.add("String", new Class_("String"));
     
     // 1. declare all classes and check for uniqueness of classes
     ListIterator<PClass> it = f.l.listIterator();
@@ -93,6 +97,7 @@ class Typing {
         superClasses.add(c); // because of toposort we know they are already processed!!
         c = c.extends_;
       }
+
       while(superClasses.isEmpty() == false){
         c = superClasses.pollLast();
         for(Attribute attribute : c.attributes.values()){
@@ -101,16 +106,16 @@ class Typing {
         for(Method method : c.methods.values()){
           class_.methods.put(method.name, method);
           TDClass currentTDclass = getTDclass.get(class_);
-          currentTDclass.l.add(getTDecl.get(method)); //add inherited method/constructor to AST
+          currentTDclass.l.add(getTDecl.get(method)); //add inherited method to AST
         }
         //how does typed AST respond in case of overriding ??
       }
 
       //let's add OUR OWN attributes, constructor and methods to hash table
       TDClass currenTDclass = getTDclass.get(class_);
-      myVisitor.setClass_(currenTDclass);
+      MyVisitor.setClass_(currenTDclass);
 
-      myVisitor.go_into_body_FALSE(); //visitor will NOT enter body of constructors and methos
+      MyVisitor.goIntoBodyFALSE(); //visitor will NOT enter body of constructors and methos
       ListIterator<PDecl> it2 = classDecl.listIterator();
       while(it2.hasNext()){
         PDecl pdecl = it2.next();
@@ -125,20 +130,24 @@ class Typing {
       }
 
       //we check if a constructor was declared, if not we give a default constructor to this class
-      if(class_.methods.get(class_.name) == null){
-        Method constructor = new Method(class_.name, new TTvoid(), new LinkedList<Variable>());
-        class_.methods.put(class_.name, constructor);
+      if(MyVisitor.hasConstructor()){
+        //Method constructor = new Method(class_.name, new TTvoid(), new LinkedList<Variable>());
+        //class_.methods.put(class_.name, constructor);
+        TDconstructor tdconstructor = new TDconstructor(new LinkedList<Variable>(), new TSblock());
+        getTDconstructor.put(class_, tdconstructor);
+        currenTDclass.l.add(tdconstructor);
       }
     }
 
     // 3. type check the body of constructors and methods
     for(Class_ class_ : sortedClasses){
+      System.out.println("CLASS " + class_.name);
       LinkedList<PDecl> classDecl = classDecls.get(class_);
       TDClass currenTDclass = getTDclass.get(class_);
-      myVisitor.setClass_(currenTDclass);
+      MyVisitor.setClass_(currenTDclass);
 
       ListIterator<PDecl> it2  = classDecl.listIterator();
-      myVisitor.go_into_body_TRUE(); //visitor will enter body of constructors and methods
+      MyVisitor.goIntoBodyTRUE(); //visitor will enter body of constructors and methods
       while(it2.hasNext()){
         PDecl pdecl = it2.next();
         if(pdecl instanceof PDattribute){
