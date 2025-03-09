@@ -14,6 +14,9 @@ class Typing {
   static HashMap<Class_, TDClass> getTDclass = new HashMap<Class_, TDClass>();
   static HashMap<Class_, TDconstructor> getTDconstructor = new HashMap<Class_, TDconstructor>();
   static HashMap<Method, TDecl> getTDecl = new HashMap<Method, TDecl>();
+  static HashMap<Attribute, Class_> getAtrrClass = new HashMap<Attribute, Class_>();
+  static Class_ IntegerClass = new Class_("String");
+  static Class_ StringClass = new Class_("String");
 
   // use this method to signal typing errors
   static void error(Location loc, String msg) {
@@ -29,8 +32,13 @@ class Typing {
     InheritanceDAG inheritanceDAG = new InheritanceDAG();
     ClassesTable.init();
     ClassesTable.add("Object", new Class_("Object"));
-    ClassesTable.add("Integer", new Class_("Integer"));
-    ClassesTable.add("String", new Class_("String"));
+    ClassesTable.add("Integer", IntegerClass);
+    ClassesTable.add("String", StringClass);
+
+    Variable equalsParam = new Variable("equalsParam", new TTclass(StringClass));
+    LinkedList<Variable> equalsParams = new LinkedList<Variable>();
+    equalsParams.add(equalsParam);
+    StringClass.methods.put("equals", new Method("equals", new TTboolean(), equalsParams));
     
     // 1. declare all classes and check for uniqueness of classes
     ListIterator<PClass> it = f.l.listIterator();
@@ -102,6 +110,7 @@ class Typing {
         c = superClasses.pollLast();
         for(Attribute attribute : c.attributes.values()){
           class_.attributes.put(attribute.name, attribute);
+          getAtrrClass.put(attribute, class_);
         }
         for(Method method : c.methods.values()){
           class_.methods.put(method.name, method);
@@ -114,6 +123,7 @@ class Typing {
       //let's add OUR OWN attributes, constructor and methods to hash table
       TDClass currenTDclass = getTDclass.get(class_);
       MyVisitor.setClass_(currenTDclass);
+      MyVisitor.hasConstructor = false;
 
       MyVisitor.goIntoBodyFALSE(); //visitor will NOT enter body of constructors and methos
       ListIterator<PDecl> it2 = classDecl.listIterator();
@@ -130,9 +140,7 @@ class Typing {
       }
 
       //we check if a constructor was declared, if not we give a default constructor to this class
-      if(MyVisitor.hasConstructor()){
-        //Method constructor = new Method(class_.name, new TTvoid(), new LinkedList<Variable>());
-        //class_.methods.put(class_.name, constructor);
+      if(MyVisitor.hasConstructor() == false){
         TDconstructor tdconstructor = new TDconstructor(new LinkedList<Variable>(), new TSblock());
         getTDconstructor.put(class_, tdconstructor);
         currenTDclass.l.add(tdconstructor);

@@ -69,6 +69,53 @@ public class MyTVisitor implements TVisitor {
 
     @Override
     public void visit(TEbinop e) {
+        Binop op = e.op;
+        TExpr e1 = e.e1;
+        TExpr e2 = e.e2;
+        switch(op){
+            case Badd:
+                System.out.println("Add");
+                break;
+            case Bsub:
+                System.out.println("Sub");
+                break;
+            case Bmul:
+                System.out.println("Mul");
+                break;
+            case Bdiv:
+                System.out.println("Div");
+                break;
+            case Bmod:
+                System.out.println("Mod");
+                break;
+            case Beq:
+                System.out.println("Eq");
+                break;
+            case Bneq:
+                System.out.println("Neq");
+                break;
+            case Blt:
+                System.out.println("Lt");
+                break;
+            case Ble:
+                System.out.println("Le");
+                break;
+            case Bgt:
+                System.out.println("Gt");
+                break;
+            case Bge:
+                System.out.println("Ge");
+                break;
+            case Band:
+                System.out.println("And");
+                break;
+            case Bor:
+                System.out.println("Or");
+                break;
+            case Badd_s:
+                System.out.println("Add_s");
+                break;
+        }
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'visit' BINOP");
     }
@@ -87,7 +134,8 @@ public class MyTVisitor implements TVisitor {
 
     @Override
     public void visit(TEnull e) {
-        System.out.println("COMPILE visiting TTnull");
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'visit' TENULL");
     }
 
     @Override
@@ -99,7 +147,7 @@ public class MyTVisitor implements TVisitor {
     @Override
     public void visit(TEassignVar e) {
         // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit' ASS_VAR");
+        throw new UnsupportedOperationException("Unimplemented method 'visit' TEASSIGNVAR");
     }
 
     @Override
@@ -116,15 +164,22 @@ public class MyTVisitor implements TVisitor {
 
     @Override
     public void visit(TEnew e) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit' NEW");
+        Class_ cl = e.cl;
+        LinkedList<TExpr> l = e.l;
+
+        ListIterator<TExpr> it = l.listIterator();
+        while(it.hasNext()){
+            TExpr te = it.next();
+            te.accept(this);
+        }
+        Compile.ret.call(cl.name + "_" + cl.name); //we call constructor
     }
 
     @Override
     public void visit(TEcall e) {
-        TExpr te = e.e;
-        Method m = e.m;
-        LinkedList<TExpr> l = e.l;
+        TExpr te = e.e; //who called
+        Method m = e.m; //what method
+        LinkedList<TExpr> l = e.l; //what are the parameters
         ListIterator<TExpr> it = l.listIterator();
 
         System.out.println("COMPILE visiting call " + m.name);
@@ -134,6 +189,7 @@ public class MyTVisitor implements TVisitor {
             msgCnt += 1;
             Compile.ret.dlabel("message" + msgCnt);
             TExpr aux = it.next(); // for print let's just assume a single argument
+            System.out.println("HERE ?");
             aux.accept(this);
             Compile.ret.string(toPrint);
 
@@ -175,8 +231,9 @@ public class MyTVisitor implements TVisitor {
 
     @Override
     public void visit(TSvar s) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit' SVAR");
+        Variable v = s.v;
+        TExpr e = s.e;
+        e.accept(this);
     }
 
     @Override
@@ -235,8 +292,6 @@ public class MyTVisitor implements TVisitor {
         System.out.println("COMPILE lets visit method " + d.m.name);
         if(tdClass.c.name.equals("Main") && d.m.name.equals("main")){
             Compile.ret.label("main");
-            Compile.ret.pushq("%rbp");
-            Compile.ret.movq("%rsp", "%rbp");
         }else{
             Compile.ret.label(tdClass.c.name + "_" + d.m.name); //use the same label we referenced in class descriptor!!
         }
