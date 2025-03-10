@@ -4,14 +4,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.ListIterator;
-import java.util.PropertyPermission;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import javax.lang.model.type.NullType;
-
-import org.w3c.dom.Attr;
 
 public class MyVisitor implements Visitor {
     /* We use this visitor to insert symbols into the Symbol Table during the static type check!
@@ -29,12 +24,11 @@ public class MyVisitor implements Visitor {
     protected static TSblock currentBlock;
     protected static TStmt currentStmt;
     protected static TExpr currentExpr;
-    protected static String callerName="";
+    protected static String dotAux="";
     protected static Boolean needsReturnStatement, hasReturnStatement;
     protected static Set<String> keywords;
     protected static HashMap<String, Variable> variables;
     protected static HashMap<Variable, PType> getVarPtype;
-    protected static boolean isElseBlock = false;
     protected static boolean stringsInvolved;
 
     public MyVisitor(){
@@ -92,6 +86,12 @@ public class MyVisitor implements Visitor {
                 return compatibilityTest(((TEunop)ei).e, tt);
             }else if(ei instanceof TEcall){
                 return ((TEcall)ei).m.type.getClass() == tt.getClass();
+            }else if(ei instanceof TEvar){
+                Variable v = ((TEvar)ei).x;
+                return v.ty.getClass() == tt.getClass();
+            }else if(ei instanceof TEattr){
+                Attribute a = ((TEattr)ei).a;
+                return a.ty.getClass() == tt.getClass();
             }else{
                 return false;
             }
@@ -108,6 +108,9 @@ public class MyVisitor implements Visitor {
             }else if(ei instanceof TEvar){
                 Variable v = ((TEvar)ei).x;
                 return v.ty.getClass() == tt.getClass();
+            }else if(ei instanceof TEattr){
+                Attribute a = ((TEattr)ei).a;
+                return a.ty.getClass() == tt.getClass();
             }else{
                 return false;
             }
@@ -123,11 +126,24 @@ public class MyVisitor implements Visitor {
                 return ttypeBinop.getClass() == tt.getClass();
             }else if(ei instanceof TEunop){
                 return compatibilityTest(((TEunop)ei).e, tt);
+            }else if(ei instanceof TEattr){
+                Attribute a = ((TEattr)ei).a;
+                TType tt2 = a.ty;
+                if(tt2 instanceof TTclass){
+                    Class_ c2 = ((TTclass)tt2).c;
+                    while(c2.name.equals(c.name) == false && c2.extends_ != null){
+                        c2 = c2.extends_;
+                    }
+                    boolean isValidDescendant = c2.name.equals(c.name);
+                    return isValidDescendant;
+                }else{
+                    return false;
+                }
             }else if(ei instanceof TEvar){
                 Variable v = ((TEvar)ei).x;
                 TType tt2 = v.ty;
-                Class_ c2 = ((TTclass)tt2).c;
                 if(tt2 instanceof TTclass){
+                    Class_ c2 = ((TTclass)tt2).c;
                     while(c2.name.equals(c.name) == false && c2.extends_ != null){
                         c2 = c2.extends_;
                     }
@@ -144,6 +160,9 @@ public class MyVisitor implements Visitor {
                 return tdclass.c.name.equals(c.name);
             }else if(ei instanceof TEassignAttr){
                 return ((TEassignAttr)ei).a.ty.getClass() == tt.getClass();
+            }else if(ei instanceof TEcall){
+                Method m = ((TEcall)ei).m;
+                return m.type.getClass() == tt.getClass();
             }else{
                 return false;
             }
@@ -199,10 +218,27 @@ public class MyVisitor implements Visitor {
         Binop op = e.op; Binop typedOp = op;
         PExpr e1 = e.e1;
         PExpr e2 = e.e2;
+
         e1.accept(this);
         TExpr te1 = currentExpr;
+        TType ttypeBinop1 = ttypeBinop;
+        TType ttypeUnop1 = ttypeUnop;
+
         e2.accept(this);
         TExpr te2 = currentExpr;
+        TType ttypeBinop2 = ttypeBinop;
+        TType ttypeUnop2 = ttypeUnop;
+
+        if(te1 instanceof TEassignAttr){//in case of an assignment, we only care about the resulting expression
+            te1 = ((TEassignAttr)te1).e2;
+        }else if(te1 instanceof TEassignVar){
+            te1 = ((TEassignVar)te1).e;
+        }
+        if(te2 instanceof TEassignAttr){
+            te2 = ((TEassignAttr)te1).e2;
+        }else if(te2 instanceof TEassignVar){
+            te2 = ((TEassignVar)te2).e;
+        }
 
         System.out.println("Show me expressions in Binop " + te1 + " " + te2 + " op=" + op);
         TTint auxTint = new TTint();
@@ -219,26 +255,40 @@ public class MyVisitor implements Visitor {
                             || (te1 instanceof TEattr && te2 instanceof TEvar && ((TEattr)te1).a.ty.getClass() == ((TEvar)te2).x.ty.getClass())
                             || (te2 instanceof TEattr && te1 instanceof TEvar && ((TEattr)te2).a.ty.getClass() == ((TEvar)te1).x.ty.getClass())
                             || (te1 instanceof TEnull && (te2 instanceof TEvar || te2 instanceof TEattr))
-                            || (te2 instanceof TEnull && (te1 instanceof TEvar || te1 instanceof TEattr));
+                            || (te2 instanceof TEnull && (te1 instanceof TEvar || te1 instanceof TEattr))
+                            || (te1 instanceof TEvar && te2 instanceof TEthis && ((TTclass)((TEvar)te1).x.ty).c.name.equals(tdclass.c.name))
+                            || (te2 instanceof TEvar && te1 instanceof TEthis && ((TTclass)((TEvar)te2).x.ty).c.name.equals(tdclass.c.name))
+                            || (te1 instanceof TEbinop && compatibilityTest(te2, ttypeBinop1) && ttypeBinop1.getClass()==auxTint.getClass())
+                            || (te2 instanceof TEbinop && compatibilityTest(te1, ttypeBinop2) && ttypeBinop2.getClass()==auxTint.getClass())
+                            || (te1 instanceof TEunop && compatibilityTest(te2, ttypeUnop1) && ttypeUnop1.getClass()==auxTint.getClass())
+                            || (te2 instanceof TEunop && compatibilityTest(te1, ttypeUnop2) && ttypeUnop2.getClass()==auxTint.getClass());
         boolean atLeastOne2 = (compatibilityTest(te1, auxTbool) && compatibilityTest(te2, auxTbool))
                             || ( te1 instanceof TEvar && te2 instanceof TEcst && ((TEvar)te1).x.ty.getClass() == auxTbool.getClass() && ((TEcst)te1).c instanceof Cbool)
                             || ( te2 instanceof TEvar && te1 instanceof TEcst && ((TEvar)te2).x.ty.getClass() == auxTbool.getClass() && ((TEcst)te1).c instanceof Cbool)
                             || (te1 instanceof TEvar && te2 instanceof TEvar && ((TEvar)te1).x.getClass() == ((TEvar)te2).x.getClass() && ((TEvar)te2).x.ty.getClass() == auxTbool.getClass())
                             || (te1 instanceof TEattr && te2 instanceof TEattr && ((TEattr)te1).a.ty.getClass() == ((TEattr)te2).a.ty.getClass())
                             || (te1 instanceof TEattr && te2 instanceof TEvar && ((TEattr)te1).a.ty.getClass() == ((TEvar)te2).x.ty.getClass())
-                            || (te2 instanceof TEattr && te1 instanceof TEvar && ((TEattr)te2).a.ty.getClass() == ((TEvar)te1).x.ty.getClass());
+                            || (te2 instanceof TEattr && te1 instanceof TEvar && ((TEattr)te2).a.ty.getClass() == ((TEvar)te1).x.ty.getClass())
+                            || (te1 instanceof TEbinop && compatibilityTest(te2, ttypeBinop1) && ttypeBinop1.getClass()==auxTbool.getClass())
+                            || (te2 instanceof TEbinop && compatibilityTest(te1, ttypeBinop2) && ttypeBinop2.getClass()==auxTbool.getClass())
+                            || (te1 instanceof TEunop && compatibilityTest(te2, ttypeUnop1) && ttypeUnop1.getClass()==auxTbool.getClass())
+                            || (te2 instanceof TEunop && compatibilityTest(te1, ttypeUnop2) && ttypeUnop2.getClass()==auxTbool.getClass());
         boolean atLeastOne3 = (compatibilityTest(te1, auxTint) && compatibilityTest(te2, auxTint))
-                            || ( te1 instanceof TEvar && te2 instanceof TEcst && ((TEvar)te1).x.ty.getClass() == auxTint.getClass() && ((TEcst)te1).c instanceof Cint)
+                            || ( te1 instanceof TEvar && te2 instanceof TEcst && ((TEvar)te1).x.ty.getClass() == auxTint.getClass() && ((TEcst)te2).c instanceof Cint)
                             || ( te2 instanceof TEvar && te1 instanceof TEcst && ((TEvar)te2).x.ty.getClass() == auxTint.getClass() && ((TEcst)te1).c instanceof Cint)
                             || (te1 instanceof TEvar && te2 instanceof TEvar && ((TEvar)te1).x.getClass() == ((TEvar)te2).x.getClass() && ((TEvar)te2).x.ty.getClass() == auxTint.getClass())
                             || (te1 instanceof TEattr && te2 instanceof TEattr && ((TEattr)te1).a.ty.getClass() == ((TEattr)te2).a.ty.getClass())
                             || (te1 instanceof TEattr && te2 instanceof TEvar && ((TEattr)te1).a.ty.getClass() == ((TEvar)te2).x.ty.getClass())
-                            || (te2 instanceof TEattr && te1 instanceof TEvar && ((TEattr)te2).a.ty.getClass() == ((TEvar)te1).x.ty.getClass());
+                            || (te2 instanceof TEattr && te1 instanceof TEvar && ((TEattr)te2).a.ty.getClass() == ((TEvar)te1).x.ty.getClass())
+                            || (te1 instanceof TEbinop && compatibilityTest(te2, ttypeBinop1) && ttypeBinop1.getClass()==auxTint.getClass())
+                            || (te2 instanceof TEbinop && compatibilityTest(te1, ttypeBinop2) && ttypeBinop2.getClass()==auxTint.getClass())
+                            || (te1 instanceof TEunop && compatibilityTest(te2, ttypeUnop1) && ttypeUnop1.getClass()==auxTint.getClass())
+                            || (te2 instanceof TEunop && compatibilityTest(te1, ttypeUnop2) && ttypeUnop2.getClass()==auxTint.getClass());
         stringsInvolved = ((te1 instanceof TEcst && ((TEcst)te1).c instanceof Cstring) || (te2 instanceof TEcst && ((TEcst)te2).c instanceof Cstring) && !(te1 instanceof TEcst && ((TEcst)te1).c instanceof Cbool) && !(te2 instanceof TEcst && ((TEcst)te2).c instanceof Cbool))
                                 || (te1 instanceof TEbinop && compatibilityTest(te1, stringType))
                                 || (te2 instanceof TEbinop && compatibilityTest(te2, stringType))
                                 || (te1 instanceof TEvar && ((TEvar)te1).x.ty.getClass() == stringType.getClass())
-                                || (te2 instanceof TEvar && ((TEvar)te1).x.ty.getClass() == stringType.getClass())
+                                || (te2 instanceof TEvar && ((TEvar)te2).x.ty.getClass() == stringType.getClass())
                                 || (te1 instanceof TEattr && ((TEattr)te1).a.ty.getClass() == stringType.getClass())
                                 || (te2 instanceof TEattr && ((TEattr)te2).a.ty.getClass() == stringType.getClass())
                                 || (te1 instanceof TEcall && ((TEcall)te1).m.type.getClass() == stringType.getClass())
@@ -438,13 +488,12 @@ public class MyVisitor implements Visitor {
             Typing.error(id.loc, "Identifier " + id.id + " violates identifier syntax");
             return;
         }
-
         if(keywords.contains(id.id)){// check if name is a keyword
             Typing.error(id.loc, "Identifier " + id.id + " is a reserved keyword");
             return;
         }
 
-        if(callerName == ""){
+        if(dotAux == ""){
             boolean found = findParam(currentTDecl, id);
 
             if(!found){
@@ -453,27 +502,46 @@ public class MyVisitor implements Visitor {
                 }else if(tdclass.c.attributes.containsKey(id.id)){
                     currentExpr = new TEattr(new TEthis(), tdclass.c.attributes.get(id.id));
                 }else{
-                    Typing.error(id.loc, "Variable " + id.id + " does not exist");
+                    Typing.error(id.loc, "Variable/attribute " + id.id + " does not exist");
                     return;
                 }
             }
 
         }else{
-            System.out.println("CHECK " + id.id + " AND " + callerName);
-            if(id.id.equals("System") && (callerName.equals("print") || callerName.equals("out"))){
-                callerName = "System_out";
+            System.out.println("CHECK " + id.id + " AND " + dotAux);
+
+            if(id.id.equals("System") && (dotAux.equals("print") || dotAux.equals("out"))){
+                dotAux = "System_out";
                 currentExpr = new TEprint(currentExpr);
+                dotAux = "";
                 return;
             }
             String callerClass = id.id;
             if(ClassesTable.classesTable.containsKey(callerClass) == false){
-                Typing.error(id.loc, "Class does not exist " + callerClass);
+                //ok, so it is a variable attribute in this case
+                if(variables.containsKey(id.id)){//dotAux is an attribute of this Variable
+                    Variable v = variables.get(id.id);
+                    PType pt = getVarPtype.get(v);
+                    Class_ class_;
+                    if(pt instanceof PTident){
+                        class_ = ClassesTable.lookup(((PTident)pt).x.id);
+                    }else{
+                        Typing.error(id.loc, "call to " + id.id + " not valid");
+                        return;
+                    }
+                    Attribute a = class_.attributes.get(dotAux);
+                    currentExpr = new TEattr(new TEvar(v), a);
+                }else{
+                    Typing.error(id.loc, "Variable " + id.id + " does not exist");
+                }
+                dotAux = "";
                 return;
             }
             Class_ c = ClassesTable.lookup(id.id);
-            if(c.attributes.containsKey(callerName)){
-                Attribute res = c.attributes.get(callerName);
+            if(c.attributes.containsKey(dotAux)){
+                Attribute res = c.attributes.get(dotAux);
                 currentExpr = new TEvar(new Variable(res.name, res.ty));
+                dotAux = "";
             }else{
                 Typing.error(id.loc, "invalid attribute name for class " + id.id);
                 return;
@@ -487,7 +555,11 @@ public class MyVisitor implements Visitor {
         PExpr pe = e.e;
         pe.accept(this);
 
-        if (tdclass.c.attributes.containsKey(id.id)) {//we are making assign to attribute
+        if(variables.containsKey(id.id)){// we check local variable first!
+            Variable v = variables.get(id.id);
+            TEassignVar aux = new TEassignVar(v, currentExpr);
+            currentExpr = aux;
+        }else if (tdclass.c.attributes.containsKey(id.id)) {//we are making assign to attribute
 
             Attribute a = tdclass.c.attributes.get(id.id);
             System.out.println(a.ty + " " + currentExpr);
@@ -498,10 +570,6 @@ public class MyVisitor implements Visitor {
             }
 
             TEassignAttr aux = new TEassignAttr(new TEthis(), a, currentExpr);
-            currentExpr = aux;
-        }else if(variables.containsKey(id.id)){
-            Variable v = variables.get(id.id);
-            TEassignVar aux = new TEassignVar(v, currentExpr);
             currentExpr = aux;
         }else{
             Typing.error(id.loc, "Attribution not possible for identifier " + id.id);
@@ -514,35 +582,51 @@ public class MyVisitor implements Visitor {
         PExpr pe = e.e;
         Ident id = e.id;
         System.out.println("PEdot id = " + id.id);
-        if(callerName.equals("")){
-            callerName = id.id;
+        if(dotAux.equals("")){
+            dotAux = id.id;
         }else{
-            callerName = id.id + "_" + callerName;
+            dotAux = id.id + "_" + dotAux;
         }
         pe.accept(this);
     }
 
     @Override
-    public void visit(PEassignDot e) { // e.next = next (attribution on field of a TEvar)
+    public void visit(PEassignDot e) {//unline PEassign, here we are sure it is an attribute!
         PExpr e1 = e.e1;
         Ident id = e.id;
         PExpr e2 = e.e2;
         System.out.println(e1 + " " + id.id + " " + e2);
+
         e1.accept(this);
-        TExpr aux = currentExpr;
-        System.out.println(currentExpr);
-        e2.accept(this);
-        TExpr aux2 = currentExpr;
-        System.out.println(currentExpr);
-        Attribute a;
+        TExpr aux = currentExpr; //this must be an object of some class!!
+        Attribute a = null;//and we need to find it!
+        TType tv = null;
         if(aux instanceof TEvar){
-            Variable v = ((TEvar)aux).x;
-            PType vt = getVarPtype.get(v);
-            System.out.println("SHIT " + vt);
+            tv = ((TEvar)aux).x.ty;
+        }else if(aux instanceof TEattr){//an attribute of an attribute of ... of some class
+            tv = ((TEattr)aux).a.ty;
+        }else{
+            Typing.error(id.loc, "Expression does not identify to an Object!");
+            return;
         }
-        currentExpr = new TEassignAttr(aux, null, aux2);
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit' EASSDOT");
+        if(tv instanceof TTclass){
+            Class_ c = ((TTclass)tv).c;
+            if(c.attributes.containsKey(id.id)){
+                a = c.attributes.get(id.id);
+            }else{
+                Typing.error(id.loc, "Attribute " + id.id + " does not exist in class " + c.name);
+                return;
+            }
+        }
+        
+        e2.accept(this);
+        TExpr aux2 = currentExpr;//can be anything...
+        if(!compatibilityTest(aux2, a.ty)){//as long as it is compatible with the attribute type!
+            Typing.error(id.loc, "Invalide type for assignment of attribute " + id.id);
+            return;
+        }
+        
+        currentExpr = new TEassignAttr(aux, a, aux2);
     }
 
     @Override
@@ -592,20 +676,20 @@ public class MyVisitor implements Visitor {
 
         LinkedList<TExpr> methodParams = new LinkedList<TExpr>();
 
-        callerName = "";
+        dotAux = "";
         pe.accept(this);
-        System.out.println("THE CALLER IS " + callerName);
+        System.out.println("THE CALLER IS " + dotAux);
 
         Method m; boolean isPrint = false;
-        if(id.id.equals("print") || id.id.equals("println") || callerName.equals("_print") || callerName.equals("System_out")){//let's make an exception for print...
+        if(id.id.equals("print") || id.id.equals("println") || dotAux.equals("_print") || dotAux.equals("System_out")){//let's make an exception for print...
             LinkedList<Variable> mv = new LinkedList<Variable>();
             mv.add(new Variable("printArg", new TTclass(Typing.StringClass)));
-            m = new Method(callerName + "_" + id.id, new TTvoid(), mv);
+            m = new Method(dotAux + "_" + id.id, new TTvoid(), mv);
             isPrint = true;
         }else{//all other methods, we have to find in some of our other classes!!
-            Class_ class_ = ClassesTable.lookup(callerName);
+            Class_ class_ = ClassesTable.lookup(dotAux);
             if(class_ == null){ // x.insert() -> it's not directly the class, we need to get it from variable type
-                System.out.println("HELP ME FIND YOU " + currentExpr + " callerName= "  + callerName + " id.id= " + id.id);
+                System.out.println("HELP ME FIND YOU " + currentExpr + " dotAux= "  + dotAux + " id.id= " + id.id);
                 if(currentExpr instanceof TEattr){
                     Attribute a  = ((TEattr)currentExpr).a;
                     if(Typing.getAtrrClass.containsKey(a)){
@@ -623,6 +707,13 @@ public class MyVisitor implements Visitor {
                         Typing.error(id.loc, "call to " + id.id + " not valid");
                         return;
                     }
+                }else if(currentExpr instanceof TEthis){
+                    if(tdclass.c.methods.containsKey(id.id)){
+                        class_ = tdclass.c;
+                    }else{
+                        Typing.error(id.loc, "class " + tdclass.c.name + " does not have method " + id.id);
+                        return;
+                    }
                 }else if(currentExpr instanceof TEcall){
                     if (id.id.equals("equals")){
                         class_ = Typing.StringClass;
@@ -633,16 +724,16 @@ public class MyVisitor implements Visitor {
         }
         TEcall tecall = new TEcall(currentExpr, m, methodParams);
 
+        if(l.size() != m.params.size()){
+            Typing.error(id.loc, "Number of arguments in function " + dotAux + "_" + id.id + " is incorrect!");
+            return;
+        }
         ListIterator<PExpr> it = l.listIterator();
         ListIterator<Variable> it2 = m.params.listIterator();
         while(it.hasNext()){
             System.out.println("Let's visit arguments for the call!");
             PExpr ei = it.next();
             ei.accept(this);
-            if(it2.hasNext() == false){
-                Typing.error(id.loc, "Too many arguments in function " + callerName + "_" + id.id + "call");
-                return;
-            }
             Variable ej = it2.next();
             System.out.println("Check parameter compatibility " + ei + " " + ej.ty);
             boolean printErrorCriteria = !(currentExpr instanceof TEcst || ttypeBinop instanceof TTboolean || ttypeBinop instanceof TTint);
@@ -650,7 +741,7 @@ public class MyVisitor implements Visitor {
                 Typing.error(id.loc, "Wrong argument type for call of Print function ");
                 return;
             }else if(!compatibilityTest(currentExpr, ej.ty)){
-                Typing.error(id.loc, "Wrong argument type for call of function " + callerName + "_" + id.id);
+                Typing.error(id.loc, "Wrong argument type for call of function " + dotAux + "_" + id.id);
                 return;
             }
             methodParams.add(currentExpr);
@@ -689,11 +780,16 @@ public class MyVisitor implements Visitor {
 
         System.out.println("Lets visit variable type");
         ptype.accept(this);
-        System.out.println("Lets visit variable expression");
-        pexpr.accept(this);
-        if(!compatibilityTest(currentExpr, ttype)){
-            Typing.error(id.loc, "Variable " + id.id + " not compatible with expression type");
-            return;
+
+        if(pexpr == null){//variable is not initialized!!
+            currentExpr = new TEnull();
+        }else{
+            System.out.println("Lets visit variable expression");
+            pexpr.accept(this);
+            if(!compatibilityTest(currentExpr, ttype)){
+                Typing.error(id.loc, "Variable " + id.id + " not compatible with expression type");
+                return;
+            }
         }
         Variable var = new Variable(id.id, ttype);
         variables.put(id.id, var);
@@ -711,19 +807,25 @@ public class MyVisitor implements Visitor {
 
         HashMap<String, Variable> variablesIf = new HashMap<String, Variable>(variables);//create deep copies of HashMap to enter each scope of if statement!!
         HashMap<String, Variable> variablesElse = new HashMap<String, Variable>(variables);
-
         HashMap<String, Variable> temp = variables;
+
+        boolean hasReturnStatementBackup = hasReturnStatement;
+        boolean ifHasReturnStatement, elseHasReturnStatement;
+
         variables = variablesIf; //we swap before entering each scope
+        hasReturnStatement = false;
         s1.accept(this);
+        ifHasReturnStatement = hasReturnStatement;
         TStmt ts1 = currentStmt;
 
         variables = variablesElse;
-        isElseBlock = true;
+        hasReturnStatement = false;
         s2.accept(this);
-        isElseBlock = false;
+        elseHasReturnStatement = hasReturnStatement;
         TStmt ts2 = currentStmt;
 
         variables = temp;//and unswap to move on at the end!
+        hasReturnStatement = hasReturnStatementBackup || (ifHasReturnStatement && elseHasReturnStatement); //both paths must have returns!!
         currentStmt = new TSif(currentExpr, ts1, ts2);
     }
 
@@ -743,8 +845,7 @@ public class MyVisitor implements Visitor {
 
         pe.accept(this);
         TDmethod tdmethod = (TDmethod)currentTDecl;
-        if(compatibilityTest(currentExpr, tdmethod.m.type) == false){
-            System.out.println(currentExpr + " " +  tdmethod.m.type);
+        if(!compatibilityTest(currentExpr, tdmethod.m.type)){
             Typing.error(null, "Invalid type for return of " + tdmethod.m.name);
             return;
         }
@@ -758,6 +859,7 @@ public class MyVisitor implements Visitor {
         currentBlock = getTSblock.get(currentTDecl);
         hasReturnStatement = false;
 
+        HashMap<String, Variable> variablesBackup = new HashMap<String, Variable>(variables); //deep copy of scope variable so we can modify it inside block
         System.out.println("VISITING STATEMENT BLOCK " + s + " linked list size = " + l.size() + " needsRet = "  + needsReturnStatement);
         while(it.hasNext()){
             PStmt st = it.next();
@@ -778,17 +880,36 @@ public class MyVisitor implements Visitor {
             currentBlock.l.add(currentStmt);
         }
         System.out.println("END OF STATEMENT BLOCK " + s + " hasRet = " + hasReturnStatement);
-        variables.clear();
-        if(needsReturnStatement && !hasReturnStatement && !isElseBlock){
-            Typing.error(null, "Method is missing a return statement");
-            return;
-        }
+        variables = variablesBackup; //we reset variables to state before the block!!
     }
 
     @Override
     public void visit(PSfor s) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit' SFOR");
+        PStmt initStmt = s.s1;
+        PExpr loopCondition = s.e;
+        PStmt endOfIterStmt = s.s2;
+        PStmt loopBody = s.s3;
+
+        initStmt.accept(this);
+        TStmt iniStmt_Typed = currentStmt;
+        loopCondition.accept(this);
+        TExpr loopCondition_Typed = currentExpr;
+        if(!compatibilityTest(loopCondition_Typed, new TTboolean())){
+            Typing.error(null, "Condition in for loop must be of type boolean!");
+            return;
+        }
+        endOfIterStmt.accept(this);
+        TStmt endOfIterStmt_Typed = currentStmt;
+
+        if(loopCondition_Typed instanceof TEcst && ((TEcst)loopCondition_Typed).c instanceof Cbool && !((Cbool)((TEcst)loopCondition_Typed).c).b){//corner case: unreachable code!!
+            currentStmt = new TSfor(loopCondition_Typed, iniStmt_Typed, endOfIterStmt_Typed, new TSblock());
+        }else{
+            HashMap<String, Variable> variablesBackup = new HashMap<String, Variable>(variables);
+            loopBody.accept(this);
+            variables = variablesBackup;
+            TStmt loopBodyStmt_Typed = currentStmt;
+            currentStmt = new TSfor(loopCondition_Typed, iniStmt_Typed, endOfIterStmt_Typed, loopBodyStmt_Typed);
+        }
     }
 
     @Override
@@ -817,6 +938,8 @@ public class MyVisitor implements Visitor {
         hasConstructor = true;
         if(goIntoBody){//let's analyse parameters and block of statements!!
 
+            HashMap<String, Variable> variablesBackup = new HashMap<String, Variable>(variables);
+
             System.out.println("SECOND PASS IN VISITOR FOR CONSTRUCTOR " + s.x.id);
             LinkedList<PParam> l = s.l;
             TDconstructor constructor = Typing.getTDconstructor.get(tdclass.c);
@@ -842,6 +965,8 @@ public class MyVisitor implements Visitor {
                     }
                     
                     parameterNames.add(pparam.x.id);
+                    variables.put(pparam.x.id, var);
+                    getVarPtype.put(var, ptype);
                 }
             }
 
@@ -849,6 +974,8 @@ public class MyVisitor implements Visitor {
             currentTDecl = Typing.getTDconstructor.get(tdclass.c);
             needsReturnStatement = false;
             s.s.accept(this);
+
+            variables = variablesBackup;
 
         }else{//let's add constructor
             System.out.println("FIRST PASS IN VISITOR FOR CONSTRUCTOR " + s.x.id + "  number of params = " + s.l.size());
@@ -884,6 +1011,8 @@ public class MyVisitor implements Visitor {
     @Override
     public void visit(PDmethod s) {
         if(goIntoBody){//let's analyse parameters, block of statements
+
+            HashMap<String, Variable> variablesBackup = new HashMap<String, Variable>(variables);
 
             System.out.println("SECOND PASS IN VISITOR FOR METHOD " + s.x.id);
             LinkedList<PParam> l = s.l;
@@ -941,6 +1070,12 @@ public class MyVisitor implements Visitor {
                 needsReturnStatement = false;
             }
             s.s.accept(this);
+            //check if return statement was found here!!
+            if(needsReturnStatement && !hasReturnStatement){
+                Typing.error(null, "Method is missing a return statement");
+                return;
+            }
+            variables = variablesBackup;
 
         }else{//let's add method
             System.out.println("FIRST PASS IN VISITOR FOR METHOD " + s.x.id);
