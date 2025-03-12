@@ -9,10 +9,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class MyVisitor implements Visitor {
-    /* We use this visitor to insert symbols into the Symbol Table during the static type check!
-     * This implies that when we visit a parsed declaration, what we want to do here is
-     * create the right symbol to insert into the Symbol Table
-     */
 
     protected static boolean goIntoBody, hasConstructor;
     protected static TType ttype;
@@ -29,7 +25,7 @@ public class MyVisitor implements Visitor {
     protected static Set<String> keywords;
     protected static HashMap<String, Variable> variables;
     protected static HashMap<Variable, PType> getVarPtype;
-    protected static boolean stringsInvolved;
+    protected static boolean stringsInvolved, startingMethodBlock;
 
     public MyVisitor(){
         goIntoBody = false;
@@ -71,7 +67,6 @@ public class MyVisitor implements Visitor {
     }
 
     public static boolean compatibilityTest(TExpr ei, TType tt){
-        System.out.println("COMPATIBILITY TEST " + ei + " " + tt);
         if(tt instanceof TTvoid){
 
         }else if(tt instanceof TTnull){
@@ -240,7 +235,6 @@ public class MyVisitor implements Visitor {
             te2 = ((TEassignVar)te2).e;
         }
 
-        System.out.println("Show me expressions in Binop " + te1 + " " + te2 + " op=" + op);
         TTint auxTint = new TTint();
         TTboolean auxTbool = new TTboolean();
         TTclass stringType = new TTclass(Typing.StringClass);
@@ -295,7 +289,6 @@ public class MyVisitor implements Visitor {
                                 || (te2 instanceof TEcall && ((TEcall)te2).m.type.getClass() == stringType.getClass());
         switch(op){ //let's check if the expression types are ok!
             case Badd:
-                System.out.println("Add");
                 if(stringsInvolved){
                     ttypeBinop = new TTclass(Typing.StringClass);
                     typedOp = Binop.Badd_s;
@@ -308,7 +301,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Bsub:
-                System.out.println("Sub");
                 ttypeBinop = new TTint();
                 if(!atLeastOne3){
                     Typing.error(null, "SUB operations need two integer operands");
@@ -316,7 +308,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Bmul:
-                System.out.println("Mul");
                 ttypeBinop = new TTint();
                 if(!atLeastOne3){
                     Typing.error(null, "MUL operations need two integer operands");
@@ -324,7 +315,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Bdiv:
-                System.out.println("Div");
                 ttypeBinop = new TTint();
                 if(!atLeastOne3){
                     Typing.error(null, "DIV operations need two integer operands");
@@ -332,7 +322,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Bmod:
-                System.out.println("Mod");
                 ttypeBinop = new TTint();
                 if(!atLeastOne3){
                     Typing.error(null, "MOD operations need two integer operands");
@@ -340,7 +329,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Beq:
-                System.out.println("Eq");
                 ttypeBinop = new TTboolean();
                 if(!atLeastOne){
                     Typing.error(null, "EQ TEST needs two compatible operands");
@@ -348,7 +336,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Bneq:
-                System.out.println("Neq");
                 ttypeBinop = new TTboolean();
                 if(!atLeastOne){
                     Typing.error(null, "NEQ TEST needs two compatible operands");
@@ -356,7 +343,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Blt:
-                System.out.println("Lt");
                 ttypeBinop = new TTboolean();
                 if(!atLeastOne){
                     Typing.error(null, "LT operations need two integer operands");
@@ -364,7 +350,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Ble:
-                System.out.println("Le");
                 ttypeBinop = new TTboolean();
                 if(!atLeastOne){
                     Typing.error(null, "LE operations need two integer operands");
@@ -372,7 +357,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Bgt:
-                System.out.println("Gt");
                 ttypeBinop = new TTboolean();
                 if(!atLeastOne){
                     Typing.error(null, "GT operations need two integer operands");
@@ -380,7 +364,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Bge:
-                System.out.println("Ge");
                 ttypeBinop = new TTboolean();
                 if(!atLeastOne){
                     Typing.error(null, "GE operations need two integer operands");
@@ -388,7 +371,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Band:
-                System.out.println("Binop And");
                 ttypeBinop = new TTboolean();
                 if(!atLeastOne2){
                     Typing.error(null, "AND operations need two boolean operands");
@@ -396,7 +378,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Bor:
-                System.out.println("Binop Or");
                 ttypeBinop = new TTboolean();
                 if(!atLeastOne2){
                     Typing.error(null, "OR operations need two boolean operands");
@@ -404,7 +385,6 @@ public class MyVisitor implements Visitor {
                 }
                 break;
             case Badd_s:
-                System.out.println("Add_s");
                 ttypeBinop = new TTclass(Typing.StringClass);
                 break;
         }
@@ -415,7 +395,6 @@ public class MyVisitor implements Visitor {
     public void visit(PEunop e) {
         Unop op = e.op; Unop typedOp = op;
         PExpr pe = e.e;
-        pe.accept(this);
 
         switch (op) {
             case Uneg:
@@ -441,6 +420,7 @@ public class MyVisitor implements Visitor {
                 break;
         }
 
+        pe.accept(this);
         TEunop te = new TEunop(typedOp, currentExpr);
         currentExpr = te;
     }
@@ -482,7 +462,6 @@ public class MyVisitor implements Visitor {
     @Override
     public void visit(PEident e) {
         Ident id = e.id;
-        System.out.println("PEident id = " + id.id);
 
         if(!isIdentifierOk(id.id)){
             Typing.error(id.loc, "Identifier " + id.id + " violates identifier syntax");
@@ -497,6 +476,7 @@ public class MyVisitor implements Visitor {
             boolean found = findParam(currentTDecl, id);
 
             if(!found){
+
                 if(variables.containsKey(id.id)){
                     currentExpr = new TEvar(variables.get(id.id));
                 }else if(tdclass.c.attributes.containsKey(id.id)){
@@ -505,17 +485,17 @@ public class MyVisitor implements Visitor {
                     Typing.error(id.loc, "Variable/attribute " + id.id + " does not exist");
                     return;
                 }
-            }
+
+            }//if found is true, new currentExpr is created inside findParam function
 
         }else{
-            System.out.println("CHECK " + id.id + " AND " + dotAux);
 
-            if(id.id.equals("System") && (dotAux.equals("print") || dotAux.equals("out"))){
+            if(id.id.equals("System") && (dotAux.equals("print") || dotAux.equals("out"))){//Expression here is the caller for print function
                 dotAux = "System_out";
-                currentExpr = new TEprint(currentExpr);
-                dotAux = "";
+                currentExpr = new TEthis();//let's ignore this later and treat print as a special case
                 return;
             }
+
             String callerClass = id.id;
             if(ClassesTable.classesTable.containsKey(callerClass) == false){
                 //ok, so it is a variable attribute in this case
@@ -525,12 +505,12 @@ public class MyVisitor implements Visitor {
                     Class_ class_;
                     if(pt instanceof PTident){
                         class_ = ClassesTable.lookup(((PTident)pt).x.id);
+                        Attribute a = class_.attributes.get(dotAux);
+                        currentExpr = new TEattr(new TEvar(v), a);
                     }else{
                         Typing.error(id.loc, "call to " + id.id + " not valid");
                         return;
                     }
-                    Attribute a = class_.attributes.get(dotAux);
-                    currentExpr = new TEattr(new TEvar(v), a);
                 }else{
                     Typing.error(id.loc, "Variable " + id.id + " does not exist");
                 }
@@ -546,6 +526,7 @@ public class MyVisitor implements Visitor {
                 Typing.error(id.loc, "invalid attribute name for class " + id.id);
                 return;
             }
+
         }
     }
 
@@ -560,9 +541,7 @@ public class MyVisitor implements Visitor {
             TEassignVar aux = new TEassignVar(v, currentExpr);
             currentExpr = aux;
         }else if (tdclass.c.attributes.containsKey(id.id)) {//we are making assign to attribute
-
             Attribute a = tdclass.c.attributes.get(id.id);
-            System.out.println(a.ty + " " + currentExpr);
 
             if(compatibilityTest(currentExpr, a.ty) == false){
                 Typing.error(id.loc, "Invalid type for assignment of attribute " + id.id);
@@ -581,7 +560,6 @@ public class MyVisitor implements Visitor {
     public void visit(PEdot e) {
         PExpr pe = e.e;
         Ident id = e.id;
-        System.out.println("PEdot id = " + id.id);
         if(dotAux.equals("")){
             dotAux = id.id;
         }else{
@@ -595,7 +573,6 @@ public class MyVisitor implements Visitor {
         PExpr e1 = e.e1;
         Ident id = e.id;
         PExpr e2 = e.e2;
-        System.out.println(e1 + " " + id.id + " " + e2);
 
         e1.accept(this);
         TExpr aux = currentExpr; //this must be an object of some class!!
@@ -670,33 +647,24 @@ public class MyVisitor implements Visitor {
         PExpr pe = e.e; //who is calling the method
         Ident id = e.id; // name of the method
         LinkedList<PExpr> l = e.l; //method parameters
-
-        System.out.println("CALL of " + id.id);
         stringsInvolved = false;
-
         LinkedList<TExpr> methodParams = new LinkedList<TExpr>();
 
         dotAux = "";
         pe.accept(this);
-        System.out.println("THE CALLER IS " + dotAux);
 
         Method m; boolean isPrint = false;
-        if(id.id.equals("print") || id.id.equals("println") || dotAux.equals("_print") || dotAux.equals("System_out")){//let's make an exception for print...
+        if(dotAux.equals("System_out")){//let's make an exception for print...
             LinkedList<Variable> mv = new LinkedList<Variable>();
             mv.add(new Variable("printArg", new TTclass(Typing.StringClass)));
-            m = new Method(dotAux + "_" + id.id, new TTvoid(), mv);
+            m = new Method("System_out_print", new TTvoid(), mv);
             isPrint = true;
+            dotAux = "";
         }else{//all other methods, we have to find in some of our other classes!!
             Class_ class_ = ClassesTable.lookup(dotAux);
             if(class_ == null){ // x.insert() -> it's not directly the class, we need to get it from variable type
-                System.out.println("HELP ME FIND YOU " + currentExpr + " dotAux= "  + dotAux + " id.id= " + id.id);
                 if(currentExpr instanceof TEattr){
                     Attribute a  = ((TEattr)currentExpr).a;
-                    if(Typing.getAtrrClass.containsKey(a)){
-                        System.out.println("VERY NICE");
-                    }else{
-                        System.out.println("SAD :(");
-                    }
                     class_ = Typing.getAtrrClass.get(a);
                 }else if(currentExpr instanceof TEvar){
                     Variable v = ((TEvar)currentExpr).x;
@@ -731,11 +699,10 @@ public class MyVisitor implements Visitor {
         ListIterator<PExpr> it = l.listIterator();
         ListIterator<Variable> it2 = m.params.listIterator();
         while(it.hasNext()){
-            System.out.println("Let's visit arguments for the call!");
             PExpr ei = it.next();
             ei.accept(this);
             Variable ej = it2.next();
-            System.out.println("Check parameter compatibility " + ei + " " + ej.ty);
+
             boolean printErrorCriteria = !(currentExpr instanceof TEcst || ttypeBinop instanceof TTboolean || ttypeBinop instanceof TTint);
             if(isPrint && printErrorCriteria && !stringsInvolved){
                 Typing.error(id.loc, "Wrong argument type for call of Print function ");
@@ -778,13 +745,11 @@ public class MyVisitor implements Visitor {
             return;
         }
 
-        System.out.println("Lets visit variable type");
         ptype.accept(this);
 
         if(pexpr == null){//variable is not initialized!!
             currentExpr = new TEnull();
         }else{
-            System.out.println("Lets visit variable expression");
             pexpr.accept(this);
             if(!compatibilityTest(currentExpr, ttype)){
                 Typing.error(id.loc, "Variable " + id.id + " not compatible with expression type");
@@ -802,8 +767,9 @@ public class MyVisitor implements Visitor {
         PExpr e = s.e;
         PStmt s1 = s.s1;
         PStmt s2 = s.s2;
-
+        
         e.accept(this);
+        TExpr ifCondition = currentExpr;
 
         HashMap<String, Variable> variablesIf = new HashMap<String, Variable>(variables);//create deep copies of HashMap to enter each scope of if statement!!
         HashMap<String, Variable> variablesElse = new HashMap<String, Variable>(variables);
@@ -826,7 +792,7 @@ public class MyVisitor implements Visitor {
 
         variables = temp;//and unswap to move on at the end!
         hasReturnStatement = hasReturnStatementBackup || (ifHasReturnStatement && elseHasReturnStatement); //both paths must have returns!!
-        currentStmt = new TSif(currentExpr, ts1, ts2);
+        currentStmt = new TSif(ifCondition, ts1, ts2);
     }
 
     @Override
@@ -856,30 +822,17 @@ public class MyVisitor implements Visitor {
     public void visit(PSblock s) {
         LinkedList<PStmt> l = s.l;
         ListIterator<PStmt> it = l.listIterator();
-        currentBlock = getTSblock.get(currentTDecl);
+
+        TSblock subBlock = new TSblock();
         hasReturnStatement = false;
 
         HashMap<String, Variable> variablesBackup = new HashMap<String, Variable>(variables); //deep copy of scope variable so we can modify it inside block
-        System.out.println("VISITING STATEMENT BLOCK " + s + " linked list size = " + l.size() + " needsRet = "  + needsReturnStatement);
         while(it.hasNext()){
             PStmt st = it.next();
-            if(st instanceof PSexpr){
-                System.out.println("Lets visit PSexpr");
-            }else if(st instanceof PSvar){
-                System.out.println("Lets visit PSvar");
-            }else if(st instanceof PSif){
-                System.out.println("Lets visit PSif");
-            }else if(st instanceof PSreturn){
-                System.out.println("Lets visit PSreturn");
-            }else if(st instanceof PSblock){
-                System.out.println("Lets visit PSblock");
-            }else if(st instanceof PSfor){
-                System.out.println("Lets visit PSfor");
-            }
             st.accept(this); //we call visitor on each statement in the block
-            currentBlock.l.add(currentStmt);
+            subBlock.l.add(currentStmt);
         }
-        System.out.println("END OF STATEMENT BLOCK " + s + " hasRet = " + hasReturnStatement);
+        currentStmt = subBlock;
         variables = variablesBackup; //we reset variables to state before the block!!
     }
 
@@ -930,7 +883,6 @@ public class MyVisitor implements Visitor {
 
     @Override
     public void visit(PDconstructor s) {
-        System.out.println("current class = " + tdclass.c.name + "  constructor name = " + s.x.id);
         if(hasConstructor){
             Typing.error(null, "Class " + tdclass.c.name + " constructor must be unique!");
             return;
@@ -940,7 +892,6 @@ public class MyVisitor implements Visitor {
 
             HashMap<String, Variable> variablesBackup = new HashMap<String, Variable>(variables);
 
-            System.out.println("SECOND PASS IN VISITOR FOR CONSTRUCTOR " + s.x.id);
             LinkedList<PParam> l = s.l;
             TDconstructor constructor = Typing.getTDconstructor.get(tdclass.c);
 
@@ -975,10 +926,13 @@ public class MyVisitor implements Visitor {
             needsReturnStatement = false;
             s.s.accept(this);
 
+            currentBlock = getTSblock.get(currentTDecl);
+            currentBlock.l.add(currentStmt);
+
             variables = variablesBackup;
 
         }else{//let's add constructor
-            System.out.println("FIRST PASS IN VISITOR FOR CONSTRUCTOR " + s.x.id + "  number of params = " + s.l.size());
+            
             if(!tdclass.c.name.equals(s.x.id)){
                 Typing.error(null, "Constructor " + s.x.id + " does not match class name " + tdclass.c.name);
                 return;
@@ -1002,9 +956,7 @@ public class MyVisitor implements Visitor {
             TDconstructor tdconstructor = new TDconstructor(tparams, new TSblock());
             getTSblock.put(tdconstructor, tsblock);
             tdclass.l.add(tdconstructor);
-            //Method m = new Method(s.x.id, new TTvoid(), tparams);
             Typing.getTDconstructor.put(ClassesTable.lookup(s.x.id), tdconstructor);
-            //Typing.getTDecl.put(m, tdconstructor);
         }
     }
 
@@ -1014,7 +966,6 @@ public class MyVisitor implements Visitor {
 
             HashMap<String, Variable> variablesBackup = new HashMap<String, Variable>(variables);
 
-            System.out.println("SECOND PASS IN VISITOR FOR METHOD " + s.x.id);
             LinkedList<PParam> l = s.l;
             Method method = tdclass.c.methods.get(s.x.id);
 
@@ -1023,8 +974,6 @@ public class MyVisitor implements Visitor {
                 Set<String> parameterNames = new HashSet<>();
                 while(it.hasNext()){
                     PParam pparam = it.next();
-
-                    System.out.println("CHECK PPARAM" + pparam.x.id);
 
                     PType ptype = pparam.ty;
                     ptype.accept(this);
@@ -1048,28 +997,11 @@ public class MyVisitor implements Visitor {
             }
 
             //Visitor will go into statement block
-            if(s.s instanceof PSexpr){
-                System.out.println("Lets visit PSexpr");
-            }else if(s.s instanceof PSvar){
-                System.out.println("Lets visit PSvar");
-            }else if(s.s instanceof PSif){
-                System.out.println("Lets visit PSif");
-            }else if(s.s instanceof PSreturn){
-                System.out.println("Lets visit PSreturn");
-            }else if(s.s instanceof PSblock){
-                System.out.println("Lets visit PSblock");
-            }else if(s.s instanceof PSfor){
-                System.out.println("Lets visit PSfor");
-            }
+            needsReturnStatement = !(method.type instanceof TTvoid);
             currentTDecl = Typing.getTDecl.get(method);
-            if(!(method.type instanceof TTvoid)){
-                System.out.println("ok, we will need a return statement " + method.type);
-                needsReturnStatement = true;
-            }else{
-                System.out.println("ok, no return statement :)");
-                needsReturnStatement = false;
-            }
             s.s.accept(this);
+            currentBlock = getTSblock.get(currentTDecl);
+            currentBlock.l.add(currentStmt);
             //check if return statement was found here!!
             if(needsReturnStatement && !hasReturnStatement){
                 Typing.error(null, "Method is missing a return statement");
@@ -1078,16 +1010,13 @@ public class MyVisitor implements Visitor {
             variables = variablesBackup;
 
         }else{//let's add method
-            System.out.println("FIRST PASS IN VISITOR FOR METHOD " + s.x.id);
             if(tdclass.c.methods.get(s.x.id) != null){
                 Typing.error(null, "Class " + tdclass.c.name + " has duplicate methods " + s.x.id);
                 return;
             }
             if(s.ty != null){
-                System.out.println("METHOD HAS TYPE " + s.ty);
                 s.ty.accept(this);
             }else{
-                System.out.println("METHOD HAS NO RETURN TYPE => VOID");
                 ttype = new TTvoid();
             }
             Method method = new Method(s.x.id, ttype, new LinkedList<Variable>());
