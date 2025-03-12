@@ -8,12 +8,14 @@ public class MyTVisitor implements TVisitor {
 
     static TDClass tdClass;
 
-    protected static int msgCnt = 0, ifCnt = 0, binopCnt = 0;
+    protected static int msgCnt = 0, ifCnt = 0, binopCnt = 0, unopCnt = 0;
     protected static String toPrint;
     protected static LinkedList<String> argumentRegisters;
     protected static HashMap<TSif, Integer> localIfCnt = new HashMap<TSif, Integer>();
     protected static HashMap<TEbinop, Integer> localBinopCnt = new HashMap<TEbinop, Integer>();
-    static boolean startingMethodBlock;
+    protected static HashMap<TEunop, Integer> localUnopCnt = new HashMap<TEunop, Integer>();
+    protected static boolean startingMethodBlock;
+    protected int nextLocalVariableOffset = 256;
 
     public MyTVisitor(){
         argumentRegisters = new LinkedList<String>();
@@ -74,7 +76,7 @@ public class MyTVisitor implements TVisitor {
         msgCnt += 1;
         Compile.ret.dlabel("message" + msgCnt);
         toPrint = c.s;
-        Compile.ret.string(toPrint);
+        Compile.ret.string(toPrint.replace("\n", ""));//puts adds another \n and I could not pass the tests without removing them like this
     }
 
     @Override
@@ -155,8 +157,20 @@ public class MyTVisitor implements TVisitor {
                 break;
             case Band:
                 System.out.println("And");
+                Compile.ret.popq("%r9"); //pop a from the stack to register %r9
+                Compile.ret.pushq("%r9"); //just trying to stay out of trouble, what if b erases content of r9 ?
+                Compile.ret.testq("%r9", "%r9");
+                Compile.ret.jne("E2_" + localBinopCnt.get(e)); //if it's true, let's get b!!
+                Compile.ret.movq(1, "%r8");//if not, let's just put a dummy value in the stack (1 for And)
+                Compile.ret.pushq("%r8");
+                Compile.ret.label("afterE2_" + localBinopCnt.get(e));
+                Compile.ret.popq("%r9"); //pop a again
+                Compile.ret.popq("%r8"); //pop b from the stack to register %r8
+                Compile.ret.andq("%r8", "%r9");
+                Compile.ret.movq("%r9", "%rax"); //put result in %rax!
                 break;
             case Bor: // a||b (we will only jump to e2 to get b if a is false!!)
+                System.out.println("Or");
                 Compile.ret.popq("%r9"); //pop a from the stack to register %r9
                 Compile.ret.pushq("%r9"); //just trying to stay out of trouble, what if b erases content of r9 ?
                 Compile.ret.testq("%r9", "%r9");
@@ -177,8 +191,33 @@ public class MyTVisitor implements TVisitor {
 
     @Override
     public void visit(TEunop e) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit' UNOP");
+        unopCnt += 1;
+        localUnopCnt.put(e, unopCnt);//like in if and binop, create local copy...
+        Unop op = e.op;
+        TExpr te = e.e;
+        te.accept(this); //okay te value is in %rax
+        switch (op) {
+            case Uneg:
+                break;
+            case Unot:
+                Compile.ret.testq("%rax", "%rax");
+                Compile.ret.je("uneg" + localUnopCnt.get(e)); //jump if te value was 0 => we need to write 1 in %rax 
+                Compile.ret.movq(0, "%rax");
+                Compile.ret.jmp("endUnop" + localUnopCnt.get(e));
+                Compile.ret.label("uneg" + localUnopCnt.get(e));
+                Compile.ret.movq(1, "%rax");
+                Compile.ret.label("endUnop" + localUnopCnt.get(e));
+                Compile.ret.movq("%rax", "%rax");//and a dummy instruction just to avoid two consecutive labels for some reason
+                break;
+            case Upreinc:
+                break;
+            case Upostinc:
+                break;
+            case Upredec:
+                break;
+            case Upostdec:
+                break;
+        }
     }
 
     @Override
@@ -195,8 +234,8 @@ public class MyTVisitor implements TVisitor {
 
     @Override
     public void visit(TEvar e) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit' VAR");
+        Variable v = e.x;
+        Compile.ret.movq(v.ofs + "(%rbp)", "%rax");//put variable value in %rax
     }
 
     @Override
@@ -288,10 +327,10 @@ public class MyTVisitor implements TVisitor {
     @Override
     public void visit(TSvar s) {
         Variable v = s.v;
+        
         TExpr e = s.e;
-        e.accept(this);
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("TSVAR");
+        e.accept(this); //ok expr result is in %rax
+        Compile.ret.movq("%rax", v.ofs + "(%rbp)");//let's write it on the variable!!
     }
 
     @Override

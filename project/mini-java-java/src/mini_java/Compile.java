@@ -53,7 +53,7 @@ class Compile {
         c = c.extends_;
       }
 
-      int cummulative_offset = 8;
+      int cummulative_offset = 8; //offset relative to rdi, assume descriptor is at offset 0
       HashMap<String, Integer> offsets = new HashMap<String, Integer>();
       while(superClasses.isEmpty() == false){
         c = superClasses.pollLast();
@@ -67,18 +67,26 @@ class Compile {
           }
         }
       }
-      
-      c = tdClass.c; //ok now let's do local variables!
-      cummulative_offset = 0;
-      for(Method method : c.methods.values()){
+
+      c = tdClass.c;
+      cummulative_offset = 8;
+      for(Method method : c.methods.values()){ //we will handle method parameters similarly
         LinkedList<Variable> variables = method.params;
         for(Variable variable : variables){
           variable.ofs = cummulative_offset;
           cummulative_offset += 8;
         }
       }
-
     }
+    int ofs = 8;
+    //okay let's do variables now!!
+    for(Variable v: MyVisitor.variables.values()){
+      if (v.ofs == -1){
+        v.ofs = ofs;
+        ofs += 8;
+      }
+    }
+    ret.subq("$" + ofs, "%rsp");
 
     // 3. compile the body of methods and constructors
     it = l.listIterator();
@@ -89,6 +97,17 @@ class Compile {
         tdecl.accept(myTVisitor);
       }
     }
+
+    //at the end let's add the wrappers for C functions
+    //------------- malloc ---------------
+    ret.label("my_malloc");
+    ret.pushq("%rbp");
+    ret.movq("%rsp", "%rbp");
+    ret.andq("$-16", "%rsp");
+    ret.call("malloc");
+    ret.movq("%rbp", "%rsp");
+    ret.popq("%rbp");
+    ret.ret();
 
     return ret;
   }

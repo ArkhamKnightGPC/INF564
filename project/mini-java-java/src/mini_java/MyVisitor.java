@@ -760,6 +760,7 @@ public class MyVisitor implements Visitor {
         variables.put(id.id, var);
         getVarPtype.put(var, ptype);
         currentStmt = new TSvar(var, currentExpr);
+        
     }
 
     @Override
