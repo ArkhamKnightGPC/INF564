@@ -63,8 +63,8 @@ class Compile {
           }else{// we need to set this offset!!
             attribute.ofs = cummulative_offset;
             offsets.put(attribute.name, attribute.ofs);
-            cummulative_offset += 8; // add 1 word to offset
           }
+          cummulative_offset += 8; // add 1 word to offset
         }
       }
 

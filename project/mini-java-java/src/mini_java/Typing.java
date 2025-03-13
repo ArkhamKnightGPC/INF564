@@ -114,14 +114,16 @@ class Typing {
         }
         for(Method method : c.methods.values()){
           class_.methods.put(method.name, method);
-          TDClass currentTDclass = getTDclass.get(class_);
-          currentTDclass.l.add(getTDecl.get(method)); //add inherited method to AST
         }
-        //how does typed AST respond in case of overriding ??
+      }
+
+      TDClass currenTDclass = getTDclass.get(class_);
+      //to handle overriding, add inherited methods to AST here!!
+      for(Method method : class_.methods.values()){
+        currenTDclass.l.add(getTDecl.get(method));
       }
 
       //let's add OUR OWN attributes, constructor and methods to hash table
-      TDClass currenTDclass = getTDclass.get(class_);
       MyVisitor.setClass_(currenTDclass);
       MyVisitor.hasConstructor = false;
 
@@ -129,13 +131,6 @@ class Typing {
       ListIterator<PDecl> it2 = classDecl.listIterator();
       while(it2.hasNext()){
         PDecl pdecl = it2.next();
-        if(pdecl instanceof PDattribute){
-          System.out.println("FIRST PASS PDattribute " + ((PDattribute)pdecl).x.id);
-        }else if(pdecl instanceof PDconstructor){
-          System.out.println("FIRST PASS PDconstructor " + ((PDconstructor)pdecl).x.id);
-        }else if(pdecl instanceof PDmethod){
-          System.out.println("FIRST PASS PDmethod " + ((PDmethod)pdecl).x.id);
-        }
         pdecl.accept(myVisitor);
       }
 
@@ -158,13 +153,6 @@ class Typing {
       MyVisitor.goIntoBodyTRUE(); //visitor will enter body of constructors and methods
       while(it2.hasNext()){
         PDecl pdecl = it2.next();
-        if(pdecl instanceof PDattribute){
-          System.out.println("SECOND PASS PDattribute " + ((PDattribute)pdecl).x.id);
-        }else if(pdecl instanceof PDconstructor){
-          System.out.println("SECOND PASS PDconstructor " + ((PDconstructor)pdecl).x.id);
-        }else if(pdecl instanceof PDmethod){
-          System.out.println("SECOND PASS PDmethod " + ((PDmethod)pdecl).x.id);
-        }
         pdecl.accept(myVisitor);
       }
     }
